@@ -55,3 +55,16 @@ body { font-family: "Cascadia Mono", Consolas, monospace; color: #cfd8dc; }
 #fx-controls input[type='range'] { width: 70px; accent-color: #4fc3f7; }
 
 body.clean-ui #panel, body.clean-ui #style-dock, body.clean-ui #status { display: none; }
+
+#city-select, #search-box {
+  width: 100%; font: inherit; font-size: 11px; color: #cfd8dc;
+  background: rgba(0, 0, 0, 0.4); border: 1px solid #263238; border-radius: 3px;
+  padding: 3px 4px; margin-bottom: 4px;
+}
+#poi-chips button, #shot-row button, #shot-chips button, #orbit-toggle {
+  font: inherit; font-size: 10px; letter-spacing: 1px; color: #cfd8dc;
+  background: none; border: 1px solid #263238; border-radius: 3px;
+  padding: 2px 6px; margin: 0 3px 3px 0; cursor: pointer;
+}
+#poi-chips button:hover, #shot-chips button:hover { color: #4fc3f7; border-color: #4fc3f7; }
+#orbit-toggle.active { color: #ffb74d; border-color: #ffb74d; }

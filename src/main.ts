@@ -1,10 +1,11 @@
-import { Color, GeoJsonDataSource, Ion, ScreenSpaceEventHandler, ScreenSpaceEventType, Viewer, defined } from 'cesium'
+import { Color, GeoJsonDataSource, Ion, Rectangle, ScreenSpaceEventHandler, ScreenSpaceEventType, Viewer, defined } from 'cesium'
 import { setBasemap, type BasemapMode } from './basemaps'
 import { QuakeLayer } from './quakes'
 import { AircraftLayer } from './aircraft'
 import { SatelliteLayer } from './satellites'
 import { addLayerRow } from './layer-panel'
 import { PRESETS, StyleFx, type Preset } from './styles-fx'
+import { CITIES, captureShot, flyToPoi, flyToShot, loadShots, makeOrbit } from './scenes'
 import { normalizeOpenSky, normalizeAdsbMil } from './flights-normalize.mjs'
 import './style.css'
 
@@ -74,7 +75,9 @@ const military = new AircraftLayer(
   viewer,
   'military',
   {
-    urls: ['/feeds/mil', '/feeds/mil2'], // proxied (no CORS upstream); adsb.fi mirrors adsb.lol's readsb API
+    // proxied (no CORS upstream); adsb.fi + airplanes.live mirror adsb.lol's readsb API —
+    // all three are volunteer-run and 502 without warning (two went down during this build)
+    urls: ['/feeds/mil', '/feeds/mil2', '/feeds/mil3'],
     normalize: normalizeAdsbMil,
     pollMs: 60_000,
     color: Color.ORANGE,
@@ -147,11 +150,79 @@ setPreset('NORMAL')
   fx.refresh()
 }
 
-// hotkeys: 1..6 style presets (CAP-44), H = clean UI (CAP-06)
+// -- scenes: city POIs + QWERT jumps (CAP-43/44/47) -------------------------
+const citySelect = document.getElementById('city-select') as HTMLSelectElement
+const poiChips = document.getElementById('poi-chips')!
+for (const c of CITIES) {
+  const opt = document.createElement('option')
+  opt.textContent = c.name
+  citySelect.appendChild(opt)
+}
+function renderPois() {
+  const city = CITIES[citySelect.selectedIndex]
+  poiChips.innerHTML = ''
+  city.pois.forEach((poi, i) => {
+    const btn = document.createElement('button')
+    btn.textContent = `${'QWERT'[i] ?? ''} ${poi.name}`
+    btn.onclick = () => flyToPoi(viewer, poi)
+    poiChips.appendChild(btn)
+  })
+}
+citySelect.onchange = renderPois
+renderPois()
+
+// -- shot planner (CAP-45) ---------------------------------------------------
+const shotChips = document.getElementById('shot-chips')!
+function renderShots() {
+  shotChips.innerHTML = ''
+  loadShots().forEach((_, i) => {
+    const btn = document.createElement('button')
+    btn.textContent = `${i + 1}`
+    btn.onclick = () => flyToShot(viewer, i)
+    shotChips.appendChild(btn)
+  })
+}
+;(document.getElementById('shot-capture') as HTMLButtonElement).onclick = () => {
+  captureShot(viewer)
+  renderShots()
+}
+renderShots()
+
+// -- cinematic orbit (CAP-46) -------------------------------------------------
+const orbit = makeOrbit(viewer)
+const orbitBtn = document.getElementById('orbit-toggle') as HTMLButtonElement
+orbitBtn.onclick = () => orbitBtn.classList.toggle('active', orbit.toggle())
+
+// -- search box: Nominatim fly-to (CAP-53) ------------------------------------
+const searchBox = document.getElementById('search-box') as HTMLInputElement
+searchBox.onkeydown = async (e) => {
+  if (e.key !== 'Enter' || !searchBox.value.trim()) return
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(searchBox.value)}`,
+    )
+    const [hit] = (await res.json()) as { boundingbox: [string, string, string, string] }[]
+    if (!hit) {
+      status.textContent = 'NO MATCH'
+      return
+    }
+    const [s, n, w, ee] = hit.boundingbox.map(Number)
+    viewer.camera.flyTo({ destination: Rectangle.fromDegrees(w, s, ee, n), duration: 2.5 })
+  } catch (err) {
+    console.warn('search failed:', err)
+  }
+}
+
+// hotkeys: 1..6 style presets, Q/W/E/R/T city POIs (CAP-44), H = clean UI (CAP-06)
 window.addEventListener('keydown', (e) => {
-  if (e.target instanceof HTMLInputElement) return
+  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return
   const n = Number(e.key)
   if (n >= 1 && n <= PRESETS.length) setPreset(PRESETS[n - 1])
+  const poiIdx = 'qwert'.indexOf(e.key.toLowerCase())
+  if (poiIdx >= 0) {
+    const poi = CITIES[citySelect.selectedIndex].pois[poiIdx]
+    if (poi) flyToPoi(viewer, poi)
+  }
   if (e.key === 'h' || e.key === 'H') document.body.classList.toggle('clean-ui')
 })
 

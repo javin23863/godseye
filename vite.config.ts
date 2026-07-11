@@ -21,6 +21,12 @@ const proxy = {
     rewrite: () => '/api/v2/mil',
     headers: { 'User-Agent': 'godseye/0.1 (+https://github.com/javin23863/godseye)' },
   },
+  '/feeds/mil3': {
+    target: 'https://api.airplanes.live',
+    changeOrigin: true,
+    rewrite: () => '/v2/mil',
+    headers: { 'User-Agent': 'godseye/0.1 (+https://github.com/javin23863/godseye)' },
+  },
 }
 
 export default defineConfig({
