@@ -28,6 +28,12 @@ body { font-family: "Cascadia Mono", Consolas, monospace; color: #cfd8dc; }
 #panel button.active { color: #4fc3f7; }
 #panel button:hover, #panel label:hover { color: #fff; }
 #panel .count { color: #ffb74d; float: right; }
+#panel .solo {
+  float: right; font: inherit; font-size: 9px; color: #455a64;
+  background: none; border: 1px solid #263238; border-radius: 2px;
+  padding: 0 3px; margin-left: 5px; cursor: pointer;
+}
+#panel .solo:hover { color: #4fc3f7; border-color: #4fc3f7; }
 
 #status {
   position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);

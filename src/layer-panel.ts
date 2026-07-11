@@ -1,7 +1,10 @@
-// DATA LAYERS panel rows: checkbox + name + live count (CAP-07 minimal shape).
+// DATA LAYERS panel rows: checkbox + name + live count (CAP-07 minimal shape)
+// + per-row SOLO isolation (CAP-30: "isolate all the military planes").
 export interface PanelLayer {
   shown: boolean
 }
+
+const rows: { layer: PanelLayer; box: HTMLInputElement }[] = []
 
 export function addLayerRow(name: string, layer: PanelLayer, opts?: { noCount?: boolean }): (count: number) => void {
   const layersDiv = document.getElementById('layers')!
@@ -11,15 +14,29 @@ export function addLayerRow(name: string, layer: PanelLayer, opts?: { noCount?: 
   box.type = 'checkbox'
   box.checked = layer.shown
   label.append(box, ` ${name} `)
-  if (opts?.noCount) {
-    layersDiv.appendChild(label)
-    box.onchange = () => (layer.shown = box.checked)
-    return () => {}
+
+  const solo = document.createElement('button')
+  solo.className = 'solo'
+  solo.textContent = 'S'
+  solo.title = `show only ${name}`
+  solo.onclick = (e) => {
+    e.preventDefault()
+    for (const r of rows) {
+      r.layer.shown = r.box === box
+      r.box.checked = r.box === box
+    }
   }
-  const countSpan = document.createElement('span')
-  countSpan.className = 'count'
-  label.append(countSpan)
+  label.appendChild(solo)
+
+  let update: (count: number) => void = () => {}
+  if (!opts?.noCount) {
+    const countSpan = document.createElement('span')
+    countSpan.className = 'count'
+    label.insertBefore(countSpan, solo)
+    update = (count) => (countSpan.textContent = String(count))
+  }
   layersDiv.appendChild(label)
   box.onchange = () => (layer.shown = box.checked)
-  return (count) => (countSpan.textContent = String(count))
+  rows.push({ layer, box })
+  return update
 }
