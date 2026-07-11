@@ -32,7 +32,8 @@ await page.goto(URL, { waitUntil: 'networkidle2', timeout: 90_000 })
 try {
   await page.waitForFunction(
     () => {
-      const rows = document.querySelectorAll('#layers label.layer-row .count') // countless rows (imagery overlays) excluded
+      // auto-populating rows only (countless imagery overlays + on-demand/stream layers excluded)
+      const rows = document.querySelectorAll('#layers label.layer-row:not([data-on-demand]) .count')
       return rows.length > 0 && [...rows].every((c) => /\d/.test(c.textContent ?? ''))
     },
     { timeout: 120_000 },
@@ -43,12 +44,17 @@ try {
 // let imagery tiles stream in
 await new Promise((r) => setTimeout(r, 20_000))
 
+// with a Google/ion key the default basemap should resolve to GOOGLE 3D, not fall back
+await page.waitForFunction(
+  () => (document.querySelector('#basemaps button.active')?.textContent ?? '') !== '',
+  { timeout: 30_000 },
+)
 const state = await page.evaluate(() => ({
   activeBasemap: document.querySelector('#basemaps button.active')?.textContent ?? null,
   layers: Object.fromEntries(
-    [...document.querySelectorAll('#layers label.layer-row')]
+    [...document.querySelectorAll('#layers label.layer-row:not([data-on-demand])')]
       .filter((l) => l.querySelector('.count'))
-      .map((l) => [l.textContent?.replace(/\d+\s*$/, '').trim(), Number(l.querySelector('.count')?.textContent ?? 0)]),
+      .map((l) => [l.textContent?.replace(/[S\d]+\s*$/, '').trim(), Number(l.querySelector('.count')?.textContent ?? 0)]),
   ),
 }))
 await page.screenshot({ path: SHOT })
@@ -57,6 +63,7 @@ await browser.close()
 const problems = []
 if (!state.activeBasemap) problems.push('no active basemap button')
 for (const [name, n] of Object.entries(state.layers)) if (!(n > 0)) problems.push(`layer ${name}: 0 entities`)
+// on-demand/streaming rows are reported for visibility but not required to be nonzero
 const pageErrors = logs.filter((l) => l.startsWith('pageerror'))
 if (pageErrors.length) problems.push(...pageErrors)
 

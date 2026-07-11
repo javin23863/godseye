@@ -18,6 +18,8 @@ export interface VoiceCommands {
   setLayer(name: string, on: boolean): boolean
   setStyle(name: string): boolean
   goTo(place: string): void
+  /** fallback for anything the keyword router doesn't match (LLM Q&A when keyed) */
+  ask(text: string): void
 }
 
 export function initVoice(cmds: VoiceCommands, onState: (state: string) => void) {
@@ -66,7 +68,9 @@ export function initVoice(cmds: VoiceCommands, onState: (state: string) => void)
     if (go) {
       cmds.goTo(go[1])
       onState(`FLYING TO ${go[1].toUpperCase()}`)
+      return
     }
+    cmds.ask(text) // free text -> LLM (no-op without a key)
   }
 
   btn.onclick = () => {

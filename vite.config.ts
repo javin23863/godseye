@@ -1,4 +1,4 @@
-import { defineConfig, type ProxyOptions } from 'vite'
+import { defineConfig, loadEnv, type ProxyOptions } from 'vite'
 import cesium from 'vite-plugin-cesium'
 
 // OpenSky + the military-ADS-B mirrors don't serve CORS headers for third-party
@@ -21,15 +21,26 @@ function feed(target: string, path: string): ProxyOptions {
   }
 }
 
-const proxy = {
-  '/feeds/opensky': feed('https://opensky-network.org', '/api/states/all'),
-  '/feeds/mil': feed('https://api.adsb.lol', '/v2/mil'),
-  '/feeds/mil2': feed('https://opendata.adsb.fi', '/api/v2/mil'),
-  '/feeds/mil3': feed('https://api.airplanes.live', '/v2/mil'),
-}
-
-export default defineConfig({
-  plugins: [cesium()],
-  server: { proxy },
-  preview: { proxy },
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const proxy: Record<string, ProxyOptions> = {
+    '/feeds/opensky': feed('https://opensky-network.org', '/api/states/all'),
+    '/feeds/mil': feed('https://api.adsb.lol', '/v2/mil'),
+    '/feeds/mil2': feed('https://opendata.adsb.fi', '/api/v2/mil'),
+    '/feeds/mil3': feed('https://api.airplanes.live', '/v2/mil'),
+  }
+  if (env.OLLAMA_API_KEY) {
+    // LLM key never reaches the bundle — proxy injects the Authorization header
+    proxy['/feeds/llm'] = {
+      target: 'https://ollama.com',
+      changeOrigin: true,
+      rewrite: () => '/api/chat',
+      headers: { Authorization: `Bearer ${env.OLLAMA_API_KEY}` },
+    }
+  }
+  return {
+    plugins: [cesium()],
+    server: { proxy },
+    preview: { proxy },
+  }
 })

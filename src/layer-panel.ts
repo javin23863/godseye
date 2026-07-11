@@ -6,10 +6,15 @@ export interface PanelLayer {
 
 const rows: { layer: PanelLayer; box: HTMLInputElement }[] = []
 
-export function addLayerRow(name: string, layer: PanelLayer, opts?: { noCount?: boolean }): (count: number) => void {
+export function addLayerRow(
+  name: string,
+  layer: PanelLayer,
+  opts?: { noCount?: boolean; onDemand?: boolean },
+): (count: number) => void {
   const layersDiv = document.getElementById('layers')!
   const label = document.createElement('label')
   label.className = 'layer-row'
+  if (opts?.onDemand) label.dataset.onDemand = 'true' // populates on user action / slow stream — verify won't require >0
   const box = document.createElement('input')
   box.type = 'checkbox'
   box.checked = layer.shown

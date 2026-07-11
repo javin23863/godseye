@@ -3,6 +3,7 @@
 import type { Aircraft, AircraftLayer } from './aircraft'
 import type { Quake, QuakeLayer } from './quakes'
 import type { SatelliteLayer } from './satellites'
+import type { Ship, ShipLayer } from './ships'
 import { recordedRange, snapshotsAt } from './recorder'
 
 const SPEEDS = [
@@ -18,6 +19,7 @@ export function initPlayback(opts: {
   military: AircraftLayer
   quakes: QuakeLayer
   sats: SatelliteLayer
+  ships?: ShipLayer
   onStatus: (text: string) => void
 }) {
   const bar = document.getElementById('timeline')!
@@ -41,19 +43,26 @@ export function initPlayback(opts: {
   let rafId = 0
   let rendering = false
 
-  const layers = { flights: opts.flights, military: opts.military, earthquakes: opts.quakes }
+  const layers: Record<string, { playback: boolean; refresh?: () => Promise<void> | void; renderItems: (i: never[]) => void }> = {
+    flights: opts.flights,
+    military: opts.military,
+    earthquakes: opts.quakes,
+    ...(opts.ships?.enabled ? { ships: opts.ships } : {}),
+  }
 
   async function renderAt(at: number) {
     if (rendering) return // scrub events outrun IndexedDB; drop frames, not correctness
     rendering = true
     try {
-      const snaps = await snapshotsAt(at, ['flights', 'military', 'earthquakes'])
+      const snaps = await snapshotsAt(at, Object.keys(layers))
       const f = snaps.get('flights')
       if (f) opts.flights.renderItems(f.items as Aircraft[])
       const m = snaps.get('military')
       if (m) opts.military.renderItems(m.items as Aircraft[])
       const q = snaps.get('earthquakes')
       if (q) opts.quakes.renderItems(q.items as Quake[])
+      const sh = snaps.get('ships')
+      if (sh && opts.ships) opts.ships.renderItems(sh.items as Ship[])
       opts.sats.playbackTime = new Date(at)
       opts.sats.repropagate()
       readout.textContent = new Date(at).toISOString().replace('T', ' ').slice(0, 19) + 'Z'
@@ -103,7 +112,7 @@ export function initPlayback(opts: {
       cancelAnimationFrame(rafId)
       for (const l of Object.values(layers)) {
         l.playback = false
-        void l.refresh() // snap back to live
+        void l.refresh?.() // snap back to live (ships resume via their own render interval)
       }
       opts.sats.playbackTime = null
       opts.sats.repropagate()

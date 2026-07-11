@@ -21,6 +21,8 @@ import { initPlayback } from './playback'
 import { initHud } from './hud'
 import { initVoice } from './voice'
 import { TrafficLayer } from './traffic'
+import { ShipLayer } from './ships'
+import { llmAsk, llmSummary } from './llm'
 import { normalizeOpenSky, normalizeAdsbMil } from './flights-normalize.mjs'
 import './style.css'
 
@@ -138,9 +140,23 @@ void (async () => {
   }
 })()
 
-// -- 4D playback (M3): record-first, scrub recorded snapshots ---------------
+// -- AIS ships (CAP-13, DS-05): aisstream WebSocket, Gulf default bbox -------
 const status = document.getElementById('status')!
-initPlayback({ flights, military, quakes, sats, onStatus: (t) => (status.textContent = t) })
+let setShipCount: (n: number) => void = () => {}
+const ships = new ShipLayer(viewer, (n) => setShipCount(n))
+if (ships.enabled) {
+  setShipCount = addLayerRow('SHIPS', ships, { onDemand: true }) // WebSocket stream fills over ~60s
+  setShipCount(0)
+  const subBtn = document.createElement('button')
+  subBtn.id = 'ships-sub'
+  subBtn.textContent = '└ SUBSCRIBE VIEW'
+  document.getElementById('layers')!.appendChild(subBtn)
+  subBtn.onclick = () => (status.textContent = ships.subscribeView())
+  ships.start()
+}
+
+// -- 4D playback (M3): record-first, scrub recorded snapshots ---------------
+initPlayback({ flights, military, quakes, sats, ships, onStatus: (t) => (status.textContent = t) })
 
 // -- style presets + effect controls (CAP-04 / CAP-05 / CAP-06) ------------
 const fx = new StyleFx(viewer)
@@ -274,7 +290,7 @@ addLayerRow(
 // -- street traffic particles (CAP-16, on-demand per view) -------------------
 let setTrafficCount: (n: number) => void
 const traffic = new TrafficLayer(viewer, (n) => setTrafficCount(n))
-setTrafficCount = addLayerRow('STREET TRAFFIC', traffic)
+setTrafficCount = addLayerRow('STREET TRAFFIC', traffic, { onDemand: true }) // manual SCAN VIEW
 setTrafficCount(0)
 const trafficBtn = document.createElement('button')
 trafficBtn.id = 'traffic-scan'
@@ -290,8 +306,17 @@ trafficBtn.onclick = async () => {
 // -- HUD telemetry + voice + AI caption (M4/M5 keyless slices) ---------------
 initHud(viewer)
 const summary = document.getElementById('hud-summary')!
-function refreshSummary() {
-  // CAP-49 template caption; LLM upgrade is env-gated later (no key in browser by default)
+function pictureContext(): string {
+  const parts = [
+    flights.shown && flights.count > 0 ? `${flights.count} commercial flights` : '',
+    military.shown && military.count > 0 ? `${military.count} military aircraft` : '',
+    sats.shown && sats.count > 0 ? `${sats.count} satellites` : '',
+    quakes.shown && quakes.count > 0 ? `${quakes.count} earthquakes (24h)` : '',
+    ships.enabled && ships.shown && ships.count > 0 ? `${ships.count} AIS vessels` : '',
+  ].filter(Boolean)
+  return `Style ${fx.preset}. Layers live: ${parts.join(', ') || 'none yet'}.`
+}
+function templateSummary() {
   const active = [
     flights.shown && flights.count > 0 ? 'FLIGHTS' : '',
     military.shown && military.count > 0 ? 'MILITARY' : '',
@@ -300,7 +325,12 @@ function refreshSummary() {
   ].filter(Boolean)
   summary.textContent = `SUMMARY: ${fx.preset} GLOBAL ${active.slice(0, 3).join(' ') || 'STANDBY'}`
 }
-window.setInterval(refreshSummary, 5_000)
+window.setInterval(templateSummary, 5_000)
+// LLM caption upgrade (CAP-49): overwrite the template once a minute when the key is live
+window.setInterval(async () => {
+  const line = await llmSummary(pictureContext())
+  if (line) summary.textContent = `SUMMARY: ${line}`
+}, 60_000)
 
 initVoice(
   {
@@ -326,6 +356,10 @@ initVoice(
       searchBox.value = place
       searchBox.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
     },
+    async ask(text) {
+      const answer = await llmAsk(text, pictureContext())
+      if (answer) status.textContent = answer
+    },
   },
   (state) => (status.textContent = state),
 )
@@ -341,6 +375,9 @@ new ScreenSpaceEventHandler(viewer.scene.canvas).setInputAction((click: { positi
     // click-to-track aircraft (CAP-10): camera locks and follows; click empty space to untrack
     viewer.trackedEntity = picked.id
     status.textContent = `TRACKING ${String(picked.id.name ?? id).toUpperCase()}`
+  } else if (id?.startsWith('ship-')) {
+    const info = ships.dossier(id)
+    if (info) status.textContent = info
   } else {
     sats.clearOrbit()
     viewer.trackedEntity = undefined
