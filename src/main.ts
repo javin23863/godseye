@@ -1,6 +1,9 @@
-import { Ion, Viewer } from 'cesium'
+import { Color, Ion, Viewer } from 'cesium'
 import { setBasemap, type BasemapMode } from './basemaps'
 import { QuakeLayer } from './quakes'
+import { AircraftLayer } from './aircraft'
+import { addLayerRow } from './layer-panel'
+import { normalizeOpenSky, normalizeAdsbMil } from './flights-normalize.mjs'
 import './style.css'
 
 const ION_TOKEN = import.meta.env.VITE_CESIUM_ION_TOKEN as string | undefined
@@ -40,17 +43,42 @@ for (const { mode, label } of MODES) {
 // boot: try google3d, falls back to aerial when keyless
 ;(basemapDiv.querySelector('button[data-mode="google3d"]') as HTMLButtonElement).click()
 
-// -- earthquakes layer (CAP-17) -------------------------------------------
-const layersDiv = document.getElementById('layers')!
-const label = document.createElement('label')
-const box = document.createElement('input')
-box.type = 'checkbox'
-box.checked = true
-const countSpan = document.createElement('span')
-countSpan.className = 'count'
-label.append(box, ' EARTHQUAKES 24H ', countSpan)
-layersDiv.appendChild(label)
-
-const quakes = new QuakeLayer(viewer, (n) => (countSpan.textContent = String(n)))
-box.onchange = () => (quakes.shown = box.checked)
+// -- data layers (CAP-07 / CAP-08 / CAP-09 / CAP-17) ----------------------
+let setQuakeCount: (n: number) => void
+const quakes = new QuakeLayer(viewer, (n) => setQuakeCount(n))
+setQuakeCount = addLayerRow('EARTHQUAKES 24H', quakes)
 quakes.start()
+
+// OpenSky anonymous: ~400 credits/day, global /states/all = 4 credits -> 15-min poll
+// stays inside budget (DS-02). OAuth2 client upgrade unlocks faster polling later.
+let setFlightCount: (n: number) => void
+const flights = new AircraftLayer(
+  viewer,
+  'flights',
+  {
+    url: '/feeds/opensky', // proxied: OpenSky serves no CORS for third-party origins
+    normalize: normalizeOpenSky,
+    pollMs: 15 * 60_000,
+    color: Color.CYAN,
+  },
+  (n) => setFlightCount(n),
+)
+setFlightCount = addLayerRow('FLIGHTS', flights)
+flights.start()
+
+// adsb.lol /v2/mil: keyless, crowdsourced military traffic (DS-03) — orange per CAP-09.
+let setMilCount: (n: number) => void
+const military = new AircraftLayer(
+  viewer,
+  'military',
+  {
+    url: '/feeds/mil', // proxied: adsb.lol serves no CORS headers
+    normalize: normalizeAdsbMil,
+    pollMs: 60_000,
+    color: Color.ORANGE,
+    labels: true,
+  },
+  (n) => setMilCount(n),
+)
+setMilCount = addLayerRow('MILITARY', military)
+military.start()

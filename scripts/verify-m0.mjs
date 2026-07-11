@@ -19,21 +19,29 @@ page.on('console', (m) => logs.push(`${m.type()}: ${m.text()}`))
 page.on('pageerror', (e) => logs.push(`pageerror: ${e.message}`))
 
 await page.goto(URL, { waitUntil: 'networkidle2', timeout: 90_000 })
-// quakes count appears once the USGS fetch lands
-await page.waitForFunction(() => /\d/.test(document.querySelector('.count')?.textContent ?? ''), { timeout: 60_000 })
+// every layer row shows a count once its first fetch lands
+await page.waitForFunction(
+  () => [...document.querySelectorAll('#layers .count')].every((c) => /\d/.test(c.textContent ?? '')),
+  { timeout: 120_000 },
+)
 // let imagery tiles stream in
 await new Promise((r) => setTimeout(r, 20_000))
 
 const state = await page.evaluate(() => ({
   activeBasemap: document.querySelector('#basemaps button.active')?.textContent ?? null,
-  quakeCount: Number(document.querySelector('.count')?.textContent ?? 0),
+  layers: Object.fromEntries(
+    [...document.querySelectorAll('#layers label')].map((l) => [
+      l.textContent?.replace(/\d+\s*$/, '').trim(),
+      Number(l.querySelector('.count')?.textContent ?? 0),
+    ]),
+  ),
 }))
 await page.screenshot({ path: SHOT })
 await browser.close()
 
 const problems = []
 if (!state.activeBasemap) problems.push('no active basemap button')
-if (!(state.quakeCount > 0)) problems.push('no quakes rendered')
+for (const [name, n] of Object.entries(state.layers)) if (!(n > 0)) problems.push(`layer ${name}: 0 entities`)
 const pageErrors = logs.filter((l) => l.startsWith('pageerror'))
 if (pageErrors.length) problems.push(...pageErrors)
 
