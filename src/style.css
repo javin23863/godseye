@@ -34,3 +34,24 @@ body { font-family: "Cascadia Mono", Consolas, monospace; color: #cfd8dc; }
   font-size: 11px; letter-spacing: 2px; color: #ffb74d;
   text-shadow: 0 0 6px rgba(0, 0, 0, 0.9); pointer-events: none;
 }
+
+#active-style {
+  position: absolute; top: 12px; right: 16px; text-align: right;
+  font-size: 10px; letter-spacing: 3px; color: #78909c;
+}
+#active-style span { color: #4fc3f7; font-size: 13px; }
+
+#style-dock {
+  position: absolute; bottom: 44px; left: 16px;
+  background: rgba(8, 14, 18, 0.82); border: 1px solid #263238;
+  border-radius: 6px; padding: 8px 10px; font-size: 10px; letter-spacing: 2px;
+}
+#style-presets button {
+  font: inherit; color: #cfd8dc; background: none; border: 1px solid #263238;
+  border-radius: 3px; padding: 3px 7px; margin-right: 4px; cursor: pointer;
+}
+#style-presets button.active { color: #4fc3f7; border-color: #4fc3f7; }
+#fx-controls { margin-top: 6px; display: flex; gap: 10px; align-items: center; color: #78909c; }
+#fx-controls input[type='range'] { width: 70px; accent-color: #4fc3f7; }
+
+body.clean-ui #panel, body.clean-ui #style-dock, body.clean-ui #status { display: none; }

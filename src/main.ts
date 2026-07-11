@@ -4,6 +4,7 @@ import { QuakeLayer } from './quakes'
 import { AircraftLayer } from './aircraft'
 import { SatelliteLayer } from './satellites'
 import { addLayerRow } from './layer-panel'
+import { PRESETS, StyleFx, type Preset } from './styles-fx'
 import { normalizeOpenSky, normalizeAdsbMil } from './flights-normalize.mjs'
 import './style.css'
 
@@ -118,15 +119,57 @@ void (async () => {
   }
 })()
 
+// -- style presets + effect controls (CAP-04 / CAP-05 / CAP-06) ------------
+const fx = new StyleFx(viewer)
+const styleName = document.getElementById('style-name')!
+const presetsDiv = document.getElementById('style-presets')!
+function setPreset(p: Preset) {
+  fx.setPreset(p)
+  styleName.textContent = p
+  for (const b of presetsDiv.querySelectorAll('button')) b.classList.toggle('active', b.textContent === p)
+}
+PRESETS.forEach((p, i) => {
+  const btn = document.createElement('button')
+  btn.textContent = p
+  btn.title = `key ${i + 1}`
+  btn.onclick = () => setPreset(p)
+  presetsDiv.appendChild(btn)
+})
+setPreset('NORMAL')
+;(document.getElementById('fx-bloom') as HTMLInputElement).onchange = (e) =>
+  fx.setBloom((e.target as HTMLInputElement).checked)
+;(document.getElementById('fx-sharpen') as HTMLInputElement).oninput = (e) => {
+  fx.sharpen = Number((e.target as HTMLInputElement).value) / 100
+  fx.refresh()
+}
+;(document.getElementById('fx-pixelate') as HTMLInputElement).oninput = (e) => {
+  fx.pixelate = Number((e.target as HTMLInputElement).value) / 100
+  fx.refresh()
+}
+
+// hotkeys: 1..6 style presets (CAP-44), H = clean UI (CAP-06)
+window.addEventListener('keydown', (e) => {
+  if (e.target instanceof HTMLInputElement) return
+  const n = Number(e.key)
+  if (n >= 1 && n <= PRESETS.length) setPreset(PRESETS[n - 1])
+  if (e.key === 'h' || e.key === 'H') document.body.classList.toggle('clean-ui')
+})
+
 // -- click-to-inspect (satellite orbit draw, CAP-11) -----------------------
 const status = document.getElementById('status')!
 new ScreenSpaceEventHandler(viewer.scene.canvas).setInputAction((click: { position: import('cesium').Cartesian2 }) => {
   const picked = viewer.scene.pick(click.position)
-  if (defined(picked) && picked.id?.id?.startsWith?.('sat-')) {
-    const info = sats.showOrbit(picked.id.id)
+  const id: string | undefined = defined(picked) ? picked.id?.id : undefined
+  if (id?.startsWith('sat-')) {
+    const info = sats.showOrbit(id)
     if (info) status.textContent = info
+  } else if (id?.startsWith('os-') || id?.startsWith('mil-')) {
+    // click-to-track aircraft (CAP-10): camera locks and follows; click empty space to untrack
+    viewer.trackedEntity = picked.id
+    status.textContent = `TRACKING ${String(picked.id.name ?? id).toUpperCase()}`
   } else {
     sats.clearOrbit()
+    viewer.trackedEntity = undefined
     status.textContent = ''
   }
 }, ScreenSpaceEventType.LEFT_CLICK)
