@@ -118,3 +118,67 @@ body.playback #pb-toggle { color: #ff5252; border-color: #ff5252; }
 #voice-toggle.active { color: #69f0ae; border-color: #69f0ae; }
 #voice-toggle:disabled { color: #455a64; cursor: default; }
 body.clean-ui #hud-tl, body.clean-ui #hud-bl, body.clean-ui #voice-toggle, body.clean-ui #timeline { display: none; }
+
+/* -- dark-vessel detection (CAP-14): scan button + side list ---------------- */
+#dark-scan {
+  font: inherit; font-size: 10px; letter-spacing: 1px; color: #78909c;
+  background: none; border: 1px solid #263238; border-radius: 3px;
+  padding: 2px 6px; margin: 2px 0 0 14px; cursor: pointer; display: block;
+}
+#dark-scan:hover { color: #4fc3f7; border-color: #4fc3f7; }
+#dark-scan:disabled { color: #455a64; cursor: default; }
+#dark-list { margin: 3px 0 0 14px; color: #546e7a; font-size: 9px; letter-spacing: 1px; }
+#dark-list .dark-row {
+  display: block; width: 100%; text-align: left; font: inherit; font-size: 9px;
+  letter-spacing: 0.5px; color: #ff8a80; background: none; border: none;
+  padding: 2px 0; cursor: pointer;
+}
+#dark-list .dark-row:hover { color: #fff; }
+
+/* -- Hormuz gate crossing panel (CAP-15) ----------------------------------- */
+#gate-panel {
+  position: absolute; top: 120px; right: 16px; width: 150px;
+  background: rgba(8, 14, 18, 0.82); border: 1px solid #263238;
+  border-radius: 6px; padding: 8px 10px;
+  font-size: 11px; letter-spacing: 2px; color: #cfd8dc;
+}
+#gate-panel h3 { font-size: 10px; letter-spacing: 3px; color: #78909c; margin-bottom: 6px; }
+#gate-panel .row { display: flex; justify-content: space-between; padding: 2px 0; }
+#gate-panel .row b { color: #ffb74d; }
+#gate-panel .row b.in { color: #9ccc65; }
+#gate-panel .row b.out { color: #4fc3f7; }
+#gate-panel .net { border-top: 1px solid #263238; margin-top: 4px; padding-top: 4px; }
+#gate-panel .sub { font-size: 9px; color: #455a64; margin-top: 6px; }
+#gate-scan, #gate-set {
+  font: inherit; font-size: 10px; letter-spacing: 1px; color: #78909c;
+  background: none; border: 1px solid #263238; border-radius: 3px;
+  padding: 2px 6px; margin: 2px 0 0 14px; cursor: pointer; display: block;
+}
+#gate-scan:hover, #gate-set:hover { color: #4fc3f7; border-color: #4fc3f7; }
+#gate-scan:disabled { color: #455a64; cursor: default; }
+body.clean-ui #gate-panel { display: none; }
+
+/* -- oil futures panel (DS-17) --------------------------------------------- */
+#oil-panel {
+  position: absolute; bottom: 74px; right: 16px; width: 240px;
+  background: rgba(8, 14, 18, 0.82); border: 1px solid #263238;
+  border-radius: 6px; padding: 8px 10px; font-size: 10px;
+}
+#oil-head {
+  display: flex; justify-content: space-between; align-items: center;
+  letter-spacing: 2px; color: #78909c;
+}
+#oil-toggle {
+  font: inherit; font-size: 12px; color: #78909c; background: none;
+  border: 1px solid #263238; border-radius: 2px; width: 16px; height: 16px;
+  line-height: 1; cursor: pointer; padding: 0;
+}
+#oil-toggle:hover { color: #4fc3f7; border-color: #4fc3f7; }
+#oil-panel.collapsed #oil-body { display: none; }
+#oil-body { margin-top: 6px; }
+#oil-chart { display: block; width: 100%; height: 56px; }
+#oil-prices { display: flex; justify-content: space-between; margin-top: 4px; letter-spacing: 1px; }
+#oil-prices .oil-brent { color: #ffb74d; }
+#oil-prices .oil-wti { color: #4fc3f7; }
+#oil-error { color: #78909c; letter-spacing: 1px; padding: 10px 0; text-align: center; }
+body.clean-ui #oil-panel { display: none; }

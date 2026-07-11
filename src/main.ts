@@ -23,6 +23,10 @@ import { initVoice } from './voice'
 import { TrafficLayer } from './traffic'
 import { ShipLayer } from './ships'
 import { llmAsk, llmSummary } from './llm'
+import { DarkVesselLayer } from './darkvessel'
+import { GateLayer } from './gates'
+import { InfraLayer } from './infra'
+import { initOilPanel } from './oil'
 import { normalizeOpenSky, normalizeAdsbMil } from './flights-normalize.mjs'
 import './style.css'
 
@@ -154,6 +158,54 @@ if (ships.enabled) {
   subBtn.onclick = () => (status.textContent = ships.subscribeView())
   ships.start()
 }
+
+// -- dark-vessel detection (CAP-14): AIS-gap analysis over recorded ship history ----------
+const darkListEl = document.createElement('div')
+darkListEl.id = 'dark-list'
+let setDarkCount: (n: number) => void = () => {}
+const darkvessel = new DarkVesselLayer(viewer, (n) => setDarkCount(n), darkListEl)
+setDarkCount = addLayerRow('DARK VESSELS', darkvessel, { onDemand: true }) // filled by SCAN DARK
+setDarkCount(0)
+const darkScanBtn = document.createElement('button')
+darkScanBtn.id = 'dark-scan'
+darkScanBtn.textContent = '└ SCAN DARK'
+document.getElementById('layers')!.append(darkScanBtn, darkListEl)
+darkScanBtn.onclick = async () => {
+  darkScanBtn.disabled = true
+  status.textContent = 'DARK VESSELS: SCANNING 6H AIS HISTORY…'
+  status.textContent = await darkvessel.scan()
+  darkScanBtn.disabled = false
+}
+
+// -- Hormuz gate crossing analytics (CAP-15, on-demand over recorded ships) ----
+const gate = new GateLayer(viewer)
+const setGateCount = addLayerRow('HORMUZ GATE', gate, { onDemand: true })
+setGateCount(0)
+const gateScan = document.createElement('button')
+gateScan.id = 'gate-scan'
+gateScan.textContent = '└ SCAN 24H'
+document.getElementById('layers')!.appendChild(gateScan)
+gateScan.onclick = async () => {
+  gateScan.disabled = true
+  status.textContent = 'GATE: REPLAYING 24H OF SHIP TRACKS…'
+  status.textContent = await gate.analyze()
+  setGateCount(gate.count)
+  gateScan.disabled = false
+}
+const gateSet = document.createElement('button')
+gateSet.id = 'gate-set'
+gateSet.textContent = '└ SET GATE (2 CLICKS)'
+document.getElementById('layers')!.appendChild(gateSet)
+gateSet.onclick = () => gate.armSetGate((t) => (status.textContent = t))
+
+// -- critical infrastructure (CAP-25): pipelines, chokepoints, ports, desalination
+let setInfraCount: (n: number) => void = () => {}
+const infra = new InfraLayer(viewer, (n) => setInfraCount(n))
+setInfraCount = addLayerRow('CRITICAL INFRA', infra)
+setInfraCount(infra.count) // constructor already rendered; show its count now the row exists
+
+// -- oil futures panel (DS-17): Brent/WTI sparklines from FRED, load-once ----
+void initOilPanel()
 
 // -- 4D playback (M3): record-first, scrub recorded snapshots ---------------
 initPlayback({ flights, military, quakes, sats, ships, onStatus: (t) => (status.textContent = t) })

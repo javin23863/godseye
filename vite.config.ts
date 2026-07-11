@@ -28,6 +28,12 @@ export default defineConfig(({ mode }) => {
     '/feeds/mil': feed('https://api.adsb.lol', '/v2/mil'),
     '/feeds/mil2': feed('https://opendata.adsb.fi', '/api/v2/mil'),
     '/feeds/mil3': feed('https://api.airplanes.live', '/v2/mil'),
+    // FRED oil-price CSV — no CORS header, proxy preserves the ?id= query (DS-17)
+    '/feeds/oil': {
+      target: 'https://fred.stlouisfed.org',
+      changeOrigin: true,
+      rewrite: (p) => p.replace(/^\/feeds\/oil/, '/graph/fredgraph.csv'),
+    },
   }
   if (env.OLLAMA_API_KEY) {
     // LLM key never reaches the bundle — proxy injects the Authorization header

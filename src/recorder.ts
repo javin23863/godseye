@@ -56,6 +56,24 @@ export async function recordedRange(): Promise<{ from: number; to: number } | nu
   })
 }
 
+/** All snapshots for one layer within [from, to], chronological. Powers analytics
+ *  (dark-vessel gaps, gate crossings) that need the whole time-series, not one frame. */
+export async function snapshotsInRange(layer: string, from: number, to: number): Promise<Snapshot[]> {
+  const db = await dbPromise
+  return new Promise((resolve) => {
+    const out: Snapshot[] = []
+    const idx = db.transaction(STORE).objectStore(STORE).index('layer-at')
+    const req = idx.openCursor(IDBKeyRange.bound([layer, from], [layer, to]), 'next')
+    req.onsuccess = () => {
+      const cur = req.result
+      if (!cur) return resolve(out)
+      out.push(cur.value as Snapshot)
+      cur.continue()
+    }
+    req.onerror = () => resolve(out)
+  })
+}
+
 /** Latest snapshot per layer at-or-before `at`. */
 export async function snapshotsAt(at: number, layers: string[]): Promise<Map<string, Snapshot>> {
   const db = await dbPromise
