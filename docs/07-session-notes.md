@@ -183,4 +183,48 @@ Plus one **negative** finding: the panel has exactly 8 rows — **no AIS/ships r
 
 ---
 
-*End of evidence log. Cross-reference: capabilities/data-source/UI/stack tables live in their own docs; this file is the provenance record.*
+*End of spec-phase evidence log. Cross-reference: capabilities/data-source/UI/stack tables live in their own docs; this file is the provenance record.*
+
+---
+
+# Build phase (2026-07-11 → 2026-07-12)
+
+The spec above was handed off, then the same operator said **"begin"** — so the build happened in-session (superseding spec-only). What shipped, in order, all on `javin23863/godseye` main.
+
+## What was built (milestone arc)
+
+- **M0** (`ef9f5b9`) — Vite + TypeScript (strict) + CesiumJS scaffold; basemap switcher GOOGLE 3D / AERIAL+LBL / ROAD with keyless graceful fallback (Esri aerial + OSM road); USGS earthquakes layer; headless-Edge verify harness.
+- **M1** — flights (OpenSky anonymous, 15-min poll = credit budget), military ADS-B (airplanes.live + adsb.lol/adsb.fi mirrors, orange), satellites (CelesTrak TLEs + satellite.js SGP4, click = orbit track), country boundaries. 8000-entity cap per aircraft layer.
+- **M2** — style presets in one branched GLSL PostProcessStage (CRT / NVG / FLIR / ANIME / NOIR, keys 1–6) + bloom/sharpen/pixelate; scenes (6 cities × POI chips, shot planner, orbit cam, Nominatim search, click-to-track).
+- **M3** — 4D playback: record-first → IndexedDB recorder; timeline scrub 1×–6h/s; satellites re-propagate at the playhead instant.
+- **M4/M5** — Web Speech voice router, DMS/alt/REC HUD telemetry, template + LLM caption, NEXRAD weather (Iowa Mesonet WMS, keyless). Through here everything runs **keyless**.
+- **Keyed features** (`fff927c`, keys in gitignored `.env`) — Google 3D tiles as default basemap; **AIS ships** (aisstream WebSocket, moving/stationary split, click dossier); **LLM** caption + voice Q&A (Ollama `minimax-m3:cloud`, key injected server-side by the `/feeds/llm` proxy, never in the bundle).
+- **Hormuz analytics suite** (`b94e080`) via a tiered opus/sonnet/haiku subagent workflow — dark-vessel detection (AIS gap over recorded history), chokepoint gate crossing tally, oil futures panel (FRED Brent/WTI), critical-infrastructure layer.
+- **Backlog-3** (`95961ed`) via a second tiered workflow (opus CCTV, sonnet GPS-jam + AOI, opus adversarial review per module) —
+  - **GPS jamming** (CAP-21): SCAN VIEW hex-bins low nav-integrity (NIC/NACp) ADS-B reports from `airplanes.live/v2/point` into red degraded-GPS cells — the gpsjam.org method, zero new feeds.
+  - **Satellite AOI access lines** (CAP-12): imaging-satellite watchlist (Pleiades/WorldView/SkySat/Capella/ICEYE…) → fan lines to curated Iran/Hormuz AOIs whenever a bird is above a tunable elevation mask; reuses the CelesTrak TLE cache.
+  - **CCTV mesh** (CAP-20): public DOT still-cams, click → fly-to framing pose + live-snapshot picture-in-picture (1 frame/min), COVERAGE footprint wedge, ALIGN-DRAPE outline/fill, manual pose sliders.
+
+## Build lessons (the non-obvious ones)
+
+- **Feed CORS** — OpenSky, adsb.lol/adsb.fi, FRED oil, and the LLM serve no third-party CORS (or hold secrets), so the app calls same-origin `/feeds/*` proxied by vite dev **and** preview. A production host must provide the same routes. `airplanes.live` is the one military mirror serving CORS `*` → fetch it browser-direct first (proxied hops forwarded browser headers and tripped upstream bot-detection; the proxy strips origin/referer/cookie/sec-* to compensate). Volunteer mirrors 502 randomly → 3-deep fallback chain.
+- **AIS ships showed 0 despite live frames** — the browser `WebSocket` delivers aisstream frames as a **Blob**, not a string (Node's `ws` gives strings, which masked it in probes); `JSON.parse("[object Blob]")` failed silently in a `catch{}`. Fix: decode the Blob first.
+- **AIS Persian Gulf = 0 vessels** — no crowd-sourced receiver coverage there; not a code bug. Default bbox moved to NW Europe (dense). The Hormuz/AIS analytics run over *recorded* history, so this is a coverage reality, not a defect.
+- **satellite.js pinned v5** — v6 ships node-only WASM that breaks browser bundling ("iife does not support top-level await"). v5 is the browser-safe SGP4.
+- **CelesTrak throttles per-IP on a ~2h window** — a repeat `GROUP=active` request returns a text banner ("GP data has not updated since your last successful request"), not TLEs. Mitigation: localStorage TLE cache (key `godseye-tle-active`, 2h TTL); headless verify seeds it via `M0_TLE_FILE`. Consequence: on a throttled run the SATELLITES layer (and the AOI access lines that reuse the same cache) legitimately read 0 — a network state, not a fault.
+- **Tiered-subagent integration pattern** — parallel agents can't safely edit shared files (`main.ts` / `index.html` / `style.css` / `vite.config.ts`). So each agent wrote only *new* self-contained module files and returned a **wiring snippet** (imports / init / css / click-prefix) via a structured schema; the main thread integrated serially. An opus adversarial review ran per module before integration — it caught the one real integration gap in backlog-3 (CCTV's `select()` needed a `cctv-` branch in the global click handler that the wiring snippet omitted).
+
+## State at handoff
+
+- **41 pure-logic unit tests** (`node --test "tests/*.test.mjs"`), `tsc --noEmit` + `vite build` clean.
+- **6 headless verify scripts** — `verify-m0` (every auto-layer populated + screenshot), `verify-styles`, `verify-playback`, `verify-keyed`, `verify-hormuz`, `verify-backlog`.
+- **Feeds are all public/open OSINT data.** Keys (Google tiles / aisstream / Ollama) live in a gitignored `.env`; the app degrades gracefully without each.
+
+## Remaining (not built — needs an operator call)
+
+- **Worker-thread parsing/clustering** (improvement B-10) — deliberately **deferred**: the 8000-entity cap holds and nothing janks yet, so building a worker pipeline now would be speculative.
+- **True projective-texture CCTV drape** onto the 3D tileset (the "draped onto real buildings" headline) — needs a classification primitive / custom tileset shader; the wedge-drape + PiP is the honest stand-in.
+- **Temporal GPS-jam evolution** across the 4D timeline (CAP-21 wants intensity that evolves with the playhead) — the current layer is a live single-scan.
+- **CCTV PnP auto-calibration** (B-18) — the author himself marked this WIP; manual pose sliders are the shipped state.
+
+*End of build-phase log.*
