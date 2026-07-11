@@ -32,7 +32,7 @@ await page.goto(URL, { waitUntil: 'networkidle2', timeout: 90_000 })
 try {
   await page.waitForFunction(
     () => {
-      const rows = document.querySelectorAll('#layers label.layer-row .count')
+      const rows = document.querySelectorAll('#layers label.layer-row .count') // countless rows (imagery overlays) excluded
       return rows.length > 0 && [...rows].every((c) => /\d/.test(c.textContent ?? ''))
     },
     { timeout: 120_000 },
@@ -46,10 +46,9 @@ await new Promise((r) => setTimeout(r, 20_000))
 const state = await page.evaluate(() => ({
   activeBasemap: document.querySelector('#basemaps button.active')?.textContent ?? null,
   layers: Object.fromEntries(
-    [...document.querySelectorAll('#layers label.layer-row')].map((l) => [
-      l.textContent?.replace(/\d+\s*$/, '').trim(),
-      Number(l.querySelector('.count')?.textContent ?? 0),
-    ]),
+    [...document.querySelectorAll('#layers label.layer-row')]
+      .filter((l) => l.querySelector('.count'))
+      .map((l) => [l.textContent?.replace(/\d+\s*$/, '').trim(), Number(l.querySelector('.count')?.textContent ?? 0)]),
   ),
 }))
 await page.screenshot({ path: SHOT })

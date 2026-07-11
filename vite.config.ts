@@ -1,32 +1,31 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type ProxyOptions } from 'vite'
 import cesium from 'vite-plugin-cesium'
 
-// OpenSky + adsb.lol don't serve CORS headers for third-party origins, so the app
-// calls same-origin /feeds/* and vite proxies (dev AND preview). A production deploy
-// needs the same two routes on its host (thin proxy per docs/02-architecture.md).
+// OpenSky + the military-ADS-B mirrors don't serve CORS headers for third-party
+// origins, so the app calls same-origin /feeds/* and vite proxies (dev AND preview).
+// A production deploy needs the same routes on its host (thin proxy, docs/02).
+// Browser headers (origin/referer/sec-*) forwarded through node TLS trip bot
+// detection on the volunteer mirrors — strip them so the request is a clean s2s GET.
+function feed(target: string, path: string): ProxyOptions {
+  return {
+    target,
+    changeOrigin: true,
+    rewrite: () => path,
+    headers: { 'User-Agent': 'godseye/0.1 (+https://github.com/javin23863/godseye)' },
+    configure(proxy) {
+      proxy.on('proxyReq', (proxyReq) => {
+        for (const h of ['origin', 'referer', 'cookie']) proxyReq.removeHeader(h)
+        for (const h of proxyReq.getHeaderNames()) if (h.startsWith('sec-')) proxyReq.removeHeader(h)
+      })
+    },
+  }
+}
+
 const proxy = {
-  '/feeds/opensky': {
-    target: 'https://opensky-network.org',
-    changeOrigin: true,
-    rewrite: () => '/api/states/all',
-  },
-  '/feeds/mil': {
-    target: 'https://api.adsb.lol',
-    changeOrigin: true,
-    rewrite: () => '/v2/mil',
-  },
-  '/feeds/mil2': {
-    target: 'https://opendata.adsb.fi',
-    changeOrigin: true,
-    rewrite: () => '/api/v2/mil',
-    headers: { 'User-Agent': 'godseye/0.1 (+https://github.com/javin23863/godseye)' },
-  },
-  '/feeds/mil3': {
-    target: 'https://api.airplanes.live',
-    changeOrigin: true,
-    rewrite: () => '/v2/mil',
-    headers: { 'User-Agent': 'godseye/0.1 (+https://github.com/javin23863/godseye)' },
-  },
+  '/feeds/opensky': feed('https://opensky-network.org', '/api/states/all'),
+  '/feeds/mil': feed('https://api.adsb.lol', '/v2/mil'),
+  '/feeds/mil2': feed('https://opendata.adsb.fi', '/api/v2/mil'),
+  '/feeds/mil3': feed('https://api.airplanes.live', '/v2/mil'),
 }
 
 export default defineConfig({

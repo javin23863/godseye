@@ -1,4 +1,15 @@
-import { Color, GeoJsonDataSource, Ion, Rectangle, ScreenSpaceEventHandler, ScreenSpaceEventType, Viewer, defined } from 'cesium'
+import {
+  Color,
+  GeoJsonDataSource,
+  ImageryLayer,
+  Ion,
+  Rectangle,
+  ScreenSpaceEventHandler,
+  ScreenSpaceEventType,
+  Viewer,
+  WebMapServiceImageryProvider,
+  defined,
+} from 'cesium'
 import { setBasemap, type BasemapMode } from './basemaps'
 import { QuakeLayer } from './quakes'
 import { AircraftLayer } from './aircraft'
@@ -7,6 +18,8 @@ import { addLayerRow } from './layer-panel'
 import { PRESETS, StyleFx, type Preset } from './styles-fx'
 import { CITIES, captureShot, flyToPoi, flyToShot, loadShots, makeOrbit } from './scenes'
 import { initPlayback } from './playback'
+import { initHud } from './hud'
+import { initVoice } from './voice'
 import { normalizeOpenSky, normalizeAdsbMil } from './flights-normalize.mjs'
 import './style.css'
 
@@ -76,9 +89,10 @@ const military = new AircraftLayer(
   viewer,
   'military',
   {
-    // proxied (no CORS upstream); adsb.fi + airplanes.live mirror adsb.lol's readsb API —
-    // all three are volunteer-run and 502 without warning (two went down during this build)
-    urls: ['/feeds/mil', '/feeds/mil2', '/feeds/mil3'],
+    // airplanes.live serves CORS * -> direct from the browser (no proxy hop to trip bot
+    // detection); adsb.lol/adsb.fi don't -> proxied fallbacks. All volunteer-run, all
+    // 502 without warning (two went down during this build).
+    urls: ['https://api.airplanes.live/v2/mil', '/feeds/mil', '/feeds/mil2'],
     normalize: normalizeAdsbMil,
     pollMs: 60_000,
     color: Color.ORANGE,
@@ -230,6 +244,74 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key === 'h' || e.key === 'H') document.body.classList.toggle('clean-ui')
 })
+
+// -- weather radar (M5, DS-09 NOAA NEXRAD via Iowa Mesonet WMS, CONUS) -------
+const nexrad = new ImageryLayer(
+  new WebMapServiceImageryProvider({
+    url: 'https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0r.cgi',
+    layers: 'nexrad-n0r',
+    parameters: { transparent: true, format: 'image/png' },
+    credit: 'NOAA NEXRAD via Iowa Environmental Mesonet',
+  }),
+  { alpha: 0.6 },
+)
+nexrad.show = false
+viewer.imageryLayers.add(nexrad)
+addLayerRow(
+  'WEATHER RADAR',
+  {
+    get shown() {
+      return nexrad.show
+    },
+    set shown(v: boolean) {
+      nexrad.show = v
+    },
+  },
+  { noCount: true }, // imagery overlay — no entity count
+)
+
+// -- HUD telemetry + voice + AI caption (M4/M5 keyless slices) ---------------
+initHud(viewer)
+const summary = document.getElementById('hud-summary')!
+function refreshSummary() {
+  // CAP-49 template caption; LLM upgrade is env-gated later (no key in browser by default)
+  const active = [
+    flights.shown && flights.count > 0 ? 'FLIGHTS' : '',
+    military.shown && military.count > 0 ? 'MILITARY' : '',
+    sats.shown && sats.count > 0 ? 'SATELLITES' : '',
+    quakes.shown && quakes.count > 0 ? 'SEISMIC' : '',
+  ].filter(Boolean)
+  summary.textContent = `SUMMARY: ${fx.preset} GLOBAL ${active.slice(0, 3).join(' ') || 'STANDBY'}`
+}
+window.setInterval(refreshSummary, 5_000)
+
+initVoice(
+  {
+    setLayer(name, on) {
+      const map: Record<string, { shown: boolean }> = {
+        flights,
+        military,
+        satellites: sats,
+        earthquakes: quakes,
+      }
+      const layer = map[name]
+      if (!layer) return false
+      layer.shown = on
+      return true
+    },
+    setStyle(name) {
+      const p = PRESETS.find((x) => x.toLowerCase() === name)
+      if (!p) return false
+      setPreset(p)
+      return true
+    },
+    goTo(place) {
+      searchBox.value = place
+      searchBox.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+    },
+  },
+  (state) => (status.textContent = state),
+)
 
 // -- click-to-inspect (satellite orbit draw, CAP-11) -----------------------
 new ScreenSpaceEventHandler(viewer.scene.canvas).setInputAction((click: { position: import('cesium').Cartesian2 }) => {

@@ -85,3 +85,23 @@ body.clean-ui #panel, body.clean-ui #style-dock, body.clean-ui #status { display
 #timeline.open #pb-play, #timeline.open #pb-speed, #timeline.open #pb-slider, #timeline.open #pb-time { visibility: visible; }
 body.playback #pb-toggle { color: #ff5252; border-color: #ff5252; }
 #pb-time { color: #ffb74d; min-width: 150px; text-align: right; }
+
+#hud-summary { color: #ffb74d !important; margin-top: 4px; }
+#hud-tl {
+  position: absolute; top: 64px; right: 16px; font-size: 10px; letter-spacing: 2px;
+  color: #ffb74d; text-shadow: 0 0 6px rgba(0, 0, 0, 0.9); pointer-events: none;
+}
+#hud-bl {
+  position: absolute; bottom: 44px; right: 16px; text-align: right;
+  font-size: 10px; letter-spacing: 2px; color: #ffb74d;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.9); pointer-events: none;
+}
+#voice-toggle {
+  position: absolute; bottom: 8px; right: 16px;
+  font: inherit; font-size: 10px; letter-spacing: 2px; color: #cfd8dc;
+  background: rgba(8, 14, 18, 0.82); border: 1px solid #263238;
+  border-radius: 6px; padding: 6px 12px; cursor: pointer;
+}
+#voice-toggle.active { color: #69f0ae; border-color: #69f0ae; }
+#voice-toggle:disabled { color: #455a64; cursor: default; }
+body.clean-ui #hud-tl, body.clean-ui #hud-bl, body.clean-ui #voice-toggle, body.clean-ui #timeline { display: none; }
