@@ -6,28 +6,34 @@ The original repo ([bilawalsidhu/gods-eye-view](https://github.com/bilawalsidhu/
 
 ## Build status
 
-Milestones M0–M5 have working keyless slices ([06-roadmap](docs/06-roadmap.md)):
+Working app, milestones M0–M5 plus the Hormuz analytics suite ([06-roadmap](docs/06-roadmap.md)):
 
-- **Globe** — CesiumJS; basemap switch GOOGLE 3D / AERIAL + LBL / ROAD. Runs keyless (Esri/OSM 2D fallback); add a Google Map Tiles key or Cesium ion token in `.env` (copy `.env.example`) for photorealistic 3D tiles.
-- **Live layers** — flights (OpenSky, 15-min anonymous budget), military (airplanes.live direct + adsb.lol/adsb.fi proxied mirrors), satellites (CelesTrak TLEs + SGP4, sparse/full, click = orbit track + class readout), earthquakes (USGS), country boundaries, NEXRAD weather overlay. 8000-entity cap per aircraft layer.
-- **Style** — CRT / NVG / FLIR / ANIME / NOIR post-process presets (keys 1–6), bloom/sharpen/pixelate, clean-UI (H).
+- **Globe** — CesiumJS; basemap switch GOOGLE 3D / AERIAL + LBL / ROAD. Runs keyless (Esri/OSM 2D fallback); with a Google Map Tiles key or Cesium ion token the photorealistic 3D tiles are the default.
+- **Live layers** — flights (OpenSky), military (airplanes.live + adsb.lol/adsb.fi mirrors), satellites (CelesTrak TLEs + SGP4, click = orbit track), earthquakes (USGS), boundaries, NEXRAD weather, **AIS ships** (aisstream WebSocket, moving/stationary split, click dossier), **street traffic** (Overpass roads + animated vehicles). 8000-entity cap per aircraft layer; per-layer SOLO isolation.
+- **Hormuz analytics** — **dark-vessel detection** (AIS-gap over recorded history), **chokepoint gate** crossing tally (preset or 2-click gate), **oil futures** panel (FRED Brent/WTI sparklines), **critical-infrastructure** layer (Gulf pipelines, chokepoints, refineries, desalination).
+- **Style** — CRT / NVG / FLIR / ANIME / NOIR presets (keys 1–6), bloom/sharpen/pixelate, clean-UI (H).
 - **Scenes** — 6 cities × 5 POI chips (Q/W/E/R/T), shot planner, orbit camera, Nominatim search.
-- **4D playback** — every live refresh records to IndexedDB; PLAYBACK mode scrubs the archive at 1×–6h/s; satellites re-propagate at the playback instant.
-- **Voice + HUD** — Web Speech commands (show/hide layers, styles, "fly to …"), DMS/alt/REC telemetry, five-word SUMMARY caption.
+- **4D playback** — every live refresh records to IndexedDB; PLAYBACK scrubs the archive at 1×–6h/s; satellites re-propagate at the playback instant.
+- **Voice + AI** — Web Speech commands + free-text Q&A, DMS/alt/REC telemetry, LLM SUMMARY caption (Ollama `minimax-m3:cloud`, falls back to a template).
 
-Still keyed/blocked: Google 3D tiles (needs key), AIS ships + dark-vessel analytics (needs aisstream.io key), CCTV projection, LLM analysis (needs API key). See [07-session-notes](docs/07-session-notes.md) gaps.
+Keys (all free-tier, in gitignored `.env` — copy `.env.example`): `VITE_GOOGLE_TILES_KEY` (3D tiles), `VITE_AISSTREAM_KEY` (ships), `OLLAMA_API_KEY` (AI caption/Q&A, injected server-side by the proxy). None required — the app degrades gracefully without each.
+
+Remaining backlog: CCTV projection, GPS-jamming layer, satellite AOI-access lines, worker-thread parsing. See [07-session-notes](docs/07-session-notes.md).
 
 ```sh
 npm install
-npm run dev        # http://localhost:5173
-npm test           # feed-normalize + TLE parser unit tests
+cp .env.example .env   # optional: add keys
+npm run dev            # http://localhost:5173
+npm test               # 28 pure-logic unit tests
 npm run build && npm run preview
-node scripts/verify-m0.mjs        # headless smoke: every layer populated + screenshot
+node scripts/verify-m0.mjs        # headless smoke: every auto-layer populated + screenshot
 node scripts/verify-styles.mjs    # cycles all six style presets
-node scripts/verify-playback.mjs  # records 75s, scrubs + plays the archive
+node scripts/verify-playback.mjs  # records, scrubs + plays the 4D archive
+node scripts/verify-keyed.mjs     # (keys set) Google 3D + AIS stream + LLM caption
+node scripts/verify-hormuz.mjs    # dark-vessel / gate / oil / infra modules
 ```
 
-Feed proxying: OpenSky and two military mirrors lack third-party CORS, so the app calls same-origin `/feeds/*`, proxied by vite dev/preview. A production host must provide the same routes (thin proxy per [02-architecture](docs/02-architecture.md)).
+Feed proxying: OpenSky, the military mirrors, FRED oil, and the LLM lack third-party CORS (or hold secrets), so the app calls same-origin `/feeds/*`, proxied by vite dev/preview. A production host must provide the same routes (thin proxy per [02-architecture](docs/02-architecture.md)); the LLM route injects `OLLAMA_API_KEY` so it never reaches the bundle.
 
 ## Docs
 
