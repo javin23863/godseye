@@ -6,6 +6,7 @@ import { SatelliteLayer } from './satellites'
 import { addLayerRow } from './layer-panel'
 import { PRESETS, StyleFx, type Preset } from './styles-fx'
 import { CITIES, captureShot, flyToPoi, flyToShot, loadShots, makeOrbit } from './scenes'
+import { initPlayback } from './playback'
 import { normalizeOpenSky, normalizeAdsbMil } from './flights-normalize.mjs'
 import './style.css'
 
@@ -122,6 +123,10 @@ void (async () => {
   }
 })()
 
+// -- 4D playback (M3): record-first, scrub recorded snapshots ---------------
+const status = document.getElementById('status')!
+initPlayback({ flights, military, quakes, sats, onStatus: (t) => (status.textContent = t) })
+
 // -- style presets + effect controls (CAP-04 / CAP-05 / CAP-06) ------------
 const fx = new StyleFx(viewer)
 const styleName = document.getElementById('style-name')!
@@ -227,7 +232,6 @@ window.addEventListener('keydown', (e) => {
 })
 
 // -- click-to-inspect (satellite orbit draw, CAP-11) -----------------------
-const status = document.getElementById('status')!
 new ScreenSpaceEventHandler(viewer.scene.canvas).setInputAction((click: { position: import('cesium').Cartesian2 }) => {
   const picked = viewer.scene.pick(click.position)
   const id: string | undefined = defined(picked) ? picked.id?.id : undefined

@@ -68,3 +68,20 @@ body.clean-ui #panel, body.clean-ui #style-dock, body.clean-ui #status { display
 }
 #poi-chips button:hover, #shot-chips button:hover { color: #4fc3f7; border-color: #4fc3f7; }
 #orbit-toggle.active { color: #ffb74d; border-color: #ffb74d; }
+
+#timeline {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; align-items: center; width: min(820px, 90vw);
+  background: rgba(8, 14, 18, 0.82); border: 1px solid #263238;
+  border-radius: 6px; padding: 6px 10px; font-size: 10px; letter-spacing: 1px;
+}
+#timeline button, #timeline select {
+  font: inherit; color: #cfd8dc; background: none; border: 1px solid #263238;
+  border-radius: 3px; padding: 2px 6px; cursor: pointer;
+}
+#timeline select option { background: #10181d; }
+#pb-slider { flex: 1; accent-color: #4fc3f7; }
+#pb-play, #pb-speed, #pb-slider, #pb-time { visibility: hidden; }
+#timeline.open #pb-play, #timeline.open #pb-speed, #timeline.open #pb-slider, #timeline.open #pb-time { visibility: visible; }
+body.playback #pb-toggle { color: #ff5252; border-color: #ff5252; }
+#pb-time { color: #ffb74d; min-width: 150px; text-align: right; }

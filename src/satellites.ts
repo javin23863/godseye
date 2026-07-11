@@ -109,13 +109,21 @@ export class SatelliteLayer {
     this.onUpdate(this.count)
   }
 
+  /** Playback: null = live "now"; a Date = propagate the whole constellation at that instant. */
+  playbackTime: Date | null = null
+
   private propagateAll() {
     if (!this.ds.show) return
-    const now = new Date()
+    const t = this.playbackTime ?? new Date()
     for (const s of this.active) {
-      const pos = eciToCartesian3(s.rec, now)
+      const pos = eciToCartesian3(s.rec, t)
       if (pos) (s.entity.position as ConstantPositionProperty).setValue(pos)
     }
+  }
+
+  /** Re-propagate immediately (playback scrubbing shouldn't wait for the 5s tick). */
+  repropagate() {
+    this.propagateAll()
   }
 
   /** Draw (or move) the orbit line for a picked satellite entity; returns info text or null. */

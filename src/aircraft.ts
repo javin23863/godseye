@@ -2,6 +2,7 @@
 // ponytail: main-thread parse + hard entity cap; move to a worker + clustering when
 // profiling shows jank (M1 engine rule will formalize).
 import { Cartesian3, Color, CustomDataSource, Viewer, Cartesian2, DistanceDisplayCondition } from 'cesium'
+import { record } from './recorder'
 
 export interface Aircraft {
   id: string
@@ -42,6 +43,9 @@ export class AircraftLayer {
     this.ds.show = v
   }
 
+  /** Playback mode: live refreshes keep recording but stop touching the screen. */
+  playback = false
+
   start() {
     void this.refresh()
     this.timer = window.setInterval(() => void this.refresh(), this.opts.pollMs)
@@ -62,32 +66,37 @@ export class AircraftLayer {
       }
       if (body === null) throw new Error('all mirrors failed')
       const craft = this.opts.normalize(body as never).slice(0, ENTITY_CAP)
-      this.ds.entities.suspendEvents()
-      this.ds.entities.removeAll()
-      for (const a of craft) {
-        this.ds.entities.add({
-          id: a.id,
-          position: Cartesian3.fromDegrees(a.lon, a.lat, Math.max(0, a.altM)),
-          point: { pixelSize: 3, color: this.opts.color },
-          label: this.opts.labels
-            ? {
-                text: a.callsign,
-                font: '10px Consolas, monospace',
-                fillColor: this.opts.color,
-                pixelOffset: new Cartesian2(6, -6),
-                // labels only near the ground — thousands of labels at global zoom melt the GPU
-                distanceDisplayCondition: new DistanceDisplayCondition(0, 3_000_000),
-                disableDepthTestDistance: Number.POSITIVE_INFINITY,
-              }
-            : undefined,
-          description: `${a.callsign} · alt ${Math.round(a.altM)} m · hdg ${Math.round(a.heading)}°`,
-        })
-      }
-      this.ds.entities.resumeEvents()
-      this.count = craft.length
-      this.onUpdate(this.count)
+      void record(this.ds.name, craft) // 4D doctrine: record-first, render second
+      if (!this.playback) this.renderItems(craft)
     } catch (e) {
       console.warn(`${this.ds.name} refresh failed, keeping last data:`, e)
     }
+  }
+
+  renderItems(craft: Aircraft[]) {
+    this.ds.entities.suspendEvents()
+    this.ds.entities.removeAll()
+    for (const a of craft) {
+      this.ds.entities.add({
+        id: a.id,
+        position: Cartesian3.fromDegrees(a.lon, a.lat, Math.max(0, a.altM)),
+        point: { pixelSize: 3, color: this.opts.color },
+        label: this.opts.labels
+          ? {
+              text: a.callsign,
+              font: '10px Consolas, monospace',
+              fillColor: this.opts.color,
+              pixelOffset: new Cartesian2(6, -6),
+              // labels only near the ground — thousands of labels at global zoom melt the GPU
+              distanceDisplayCondition: new DistanceDisplayCondition(0, 3_000_000),
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            }
+          : undefined,
+        description: `${a.callsign} · alt ${Math.round(a.altM)} m · hdg ${Math.round(a.heading)}°`,
+      })
+    }
+    this.ds.entities.resumeEvents()
+    this.count = craft.length
+    this.onUpdate(this.count)
   }
 }
