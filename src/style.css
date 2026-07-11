@@ -182,3 +182,50 @@ body.clean-ui #gate-panel { display: none; }
 #oil-prices .oil-wti { color: #4fc3f7; }
 #oil-error { color: #78909c; letter-spacing: 1px; padding: 10px 0; text-align: center; }
 body.clean-ui #oil-panel { display: none; }
+
+/* -- GPS jamming scan button (CAP-21) — mirrors the other └ SCAN rows -------- */
+#jam-scan {
+  font: inherit; font-size: 10px; letter-spacing: 1px; color: #78909c;
+  background: none; border: 1px solid #263238; border-radius: 3px;
+  padding: 2px 6px; margin: 2px 0 0 14px; cursor: pointer; display: block;
+}
+#jam-scan:hover { color: #4fc3f7; border-color: #4fc3f7; }
+#jam-scan:disabled { color: #455a64; cursor: default; }
+
+/* -- CCTV mesh: scan-style buttons + snapshot PiP (CAP-20) ---------------- */
+#cctv-coverage, #cctv-drape {
+  font: inherit; font-size: 10px; letter-spacing: 1px; color: #78909c;
+  background: none; border: 1px solid #263238; border-radius: 3px;
+  padding: 2px 6px; margin: 2px 0 0 14px; cursor: pointer; display: block;
+}
+#cctv-coverage:hover, #cctv-drape:hover { color: #4fc3f7; border-color: #4fc3f7; }
+#cctv-coverage.active, #cctv-drape.active { color: #4fc3f7; border-color: #4fc3f7; }
+
+#cctv-pip {
+  position: absolute; right: 16px; bottom: 130px; width: 260px; display: none;
+  background: rgba(8, 14, 18, 0.9); border: 1px solid #263238; border-radius: 6px;
+  overflow: hidden; z-index: 5;
+}
+#cctv-pip-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 8px; font-size: 10px; letter-spacing: 2px; color: #4fc3f7;
+  border-bottom: 1px solid #263238;
+}
+#cctv-pip-head button {
+  font: inherit; color: #78909c; background: none; border: none; cursor: pointer;
+}
+#cctv-pip-head button:hover { color: #fff; }
+#cctv-pip-view { position: relative; width: 100%; height: 146px; background: #000; }
+#cctv-pip-img { width: 100%; height: 146px; object-fit: cover; display: block; }
+#cctv-pip-fallback {
+  display: none; position: absolute; inset: 0; flex-direction: column;
+  align-items: center; justify-content: center; gap: 4px; text-align: center;
+  font-size: 11px; letter-spacing: 2px; color: #ff7043;
+}
+#cctv-pip-fallback small { color: #78909c; font-size: 9px; letter-spacing: 1px; }
+#cctv-pip-pose { padding: 6px 8px; font-size: 9px; letter-spacing: 1px; color: #90a4ae; }
+#cctv-pip-pose label { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+#cctv-pip-pose input[type=range] { flex: 1; accent-color: #4fc3f7; height: 3px; }
+#cctv-pip-pose span { color: #ffb74d; min-width: 26px; text-align: right; }
+#cctv-pip-note { margin-top: 4px; color: #546e7a; font-size: 8px; letter-spacing: 2px; }
+body.clean-ui #cctv-pip { display: none; }

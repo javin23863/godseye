@@ -27,6 +27,9 @@ import { DarkVesselLayer } from './darkvessel'
 import { GateLayer } from './gates'
 import { InfraLayer } from './infra'
 import { initOilPanel } from './oil'
+import { GpsJamLayer } from './gpsjam'
+import { AOILayer } from './aoi'
+import { CctvLayer } from './cctv'
 import { normalizeOpenSky, normalizeAdsbMil } from './flights-normalize.mjs'
 import './style.css'
 
@@ -355,6 +358,68 @@ trafficBtn.onclick = async () => {
   trafficBtn.disabled = false
 }
 
+// -- GPS jamming (CAP-21, on-demand per view) ---------------------------------
+// gpsjam.org method: hex-bin low nav-integrity (NIC/NACp) ADS-B reports; a cluster
+// of degraded reports = an active jamming cell. Keyless airplanes.live point query.
+let setJamCount: (n: number) => void
+const gpsjam = new GpsJamLayer(viewer, (n) => setJamCount(n))
+setJamCount = addLayerRow('GPS JAMMING', gpsjam, { onDemand: true }) // manual SCAN VIEW
+setJamCount(0)
+const jamBtn = document.createElement('button')
+jamBtn.id = 'jam-scan'
+jamBtn.textContent = '└ SCAN VIEW'
+document.getElementById('layers')!.appendChild(jamBtn)
+jamBtn.onclick = async () => {
+  jamBtn.disabled = true
+  status.textContent = 'GPS JAM: QUERYING ADS-B INTEGRITY…'
+  status.textContent = await gpsjam.scan()
+  jamBtn.disabled = false
+}
+
+// -- satellite-to-ground AOI access lines (CAP-12, AC-05; imaging watchlist CAP-29) --
+// Line drawn sat->AOI whenever an imaging bird is above the elevation mask over a target.
+let setAoiCount: (n: number) => void
+const aoiLines = new AOILayer(viewer, (n) => setAoiCount(n))
+setAoiCount = addLayerRow('SAT AOI LINES', aoiLines, { onDemand: true }) // imaging passes are intermittent -> 0 is honest
+setAoiCount(0)
+const maskLabel = document.createElement('label')
+const maskInput = document.createElement('input')
+maskInput.type = 'range'
+maskInput.min = '5'
+maskInput.max = '60'
+maskInput.value = '20'
+maskLabel.append(' └ MASK ', maskInput, '°')
+document.getElementById('layers')!.appendChild(maskLabel)
+maskInput.oninput = () => aoiLines.setMask(Number(maskInput.value))
+
+// -- live CCTV mesh + ground projection (CAP-20, AC-04) ---------------------
+// Public DOT still-cams: marker per cam, click -> fly to a framing pose looking
+// along the cam heading + PiP live snapshot (1 frame/min). COVERAGE draws the
+// ground footprint wedge; ALIGN-DRAPE toggles outline (PROJECTION) vs filled
+// (DRAPE). Pose sliders live in the PiP (auto-cal is WIP per the author).
+let setCctvCount: (n: number) => void = () => {}
+const cctv = new CctvLayer(viewer, (n) => setCctvCount(n))
+setCctvCount = addLayerRow('CCTV MESH', cctv)
+setCctvCount(cctv.count) // constructor already rendered the markers
+const cctvCov = document.createElement('button')
+cctvCov.id = 'cctv-coverage'
+cctvCov.textContent = '└ COVERAGE'
+document.getElementById('layers')!.appendChild(cctvCov)
+cctvCov.onclick = () => {
+  const on = !cctvCov.classList.contains('active')
+  cctvCov.classList.toggle('active', on)
+  status.textContent = cctv.setCoverage(on)
+}
+const cctvDrape = document.createElement('button')
+cctvDrape.id = 'cctv-drape'
+cctvDrape.textContent = '└ ALIGN-DRAPE'
+document.getElementById('layers')!.appendChild(cctvDrape)
+cctvDrape.onclick = () => {
+  const on = !cctvDrape.classList.contains('active')
+  cctvDrape.classList.toggle('active', on)
+  status.textContent = cctv.setDrape(on)
+}
+
 // -- HUD telemetry + voice + AI caption (M4/M5 keyless slices) ---------------
 initHud(viewer)
 const summary = document.getElementById('hud-summary')!
@@ -430,6 +495,9 @@ new ScreenSpaceEventHandler(viewer.scene.canvas).setInputAction((click: { positi
   } else if (id?.startsWith('ship-')) {
     const info = ships.dossier(id)
     if (info) status.textContent = info
+  } else if (id?.startsWith('cctv-')) {
+    // CCTV cam (CAP-20): fly to framing pose + open the live-snapshot PiP
+    status.textContent = cctv.select(id)
   } else {
     sats.clearOrbit()
     viewer.trackedEntity = undefined
