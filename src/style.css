@@ -34,6 +34,13 @@ body { font-family: "Cascadia Mono", Consolas, monospace; color: #cfd8dc; }
   padding: 0 3px; margin-left: 5px; cursor: pointer;
 }
 #panel .solo:hover { color: #4fc3f7; border-color: #4fc3f7; }
+#traffic-scan {
+  font: inherit; font-size: 10px; letter-spacing: 1px; color: #78909c;
+  background: none; border: 1px solid #263238; border-radius: 3px;
+  padding: 2px 6px; margin: 2px 0 0 14px; cursor: pointer; display: block;
+}
+#traffic-scan:hover { color: #4fc3f7; border-color: #4fc3f7; }
+#traffic-scan:disabled { color: #455a64; cursor: default; }
 
 #status {
   position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);

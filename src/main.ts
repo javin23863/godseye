@@ -20,6 +20,7 @@ import { CITIES, captureShot, flyToPoi, flyToShot, loadShots, makeOrbit } from '
 import { initPlayback } from './playback'
 import { initHud } from './hud'
 import { initVoice } from './voice'
+import { TrafficLayer } from './traffic'
 import { normalizeOpenSky, normalizeAdsbMil } from './flights-normalize.mjs'
 import './style.css'
 
@@ -269,6 +270,22 @@ addLayerRow(
   },
   { noCount: true }, // imagery overlay — no entity count
 )
+
+// -- street traffic particles (CAP-16, on-demand per view) -------------------
+let setTrafficCount: (n: number) => void
+const traffic = new TrafficLayer(viewer, (n) => setTrafficCount(n))
+setTrafficCount = addLayerRow('STREET TRAFFIC', traffic)
+setTrafficCount(0)
+const trafficBtn = document.createElement('button')
+trafficBtn.id = 'traffic-scan'
+trafficBtn.textContent = '└ SCAN VIEW'
+document.getElementById('layers')!.appendChild(trafficBtn)
+trafficBtn.onclick = async () => {
+  trafficBtn.disabled = true
+  status.textContent = 'TRAFFIC: QUERYING ROAD NETWORK…'
+  status.textContent = await traffic.activate()
+  trafficBtn.disabled = false
+}
 
 // -- HUD telemetry + voice + AI caption (M4/M5 keyless slices) ---------------
 initHud(viewer)
