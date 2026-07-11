@@ -2,7 +2,19 @@
 
 Spec, documentation, and roadmap for rebuilding **God's Eye View** — Bilawal Sidhu's browser-based geospatial OSINT command center (CesiumJS + Google Photorealistic 3D Tiles globe, live OSINT layers, 4D timeline playback, sensor-style shaders, voice + AI analysis).
 
-**This repo is spec-only.** No application code yet — the docs below are the handoff package for the dev agent that builds it. The original repo ([bilawalsidhu/gods-eye-view](https://github.com/bilawalsidhu/gods-eye-view)) is a placeholder with no code (release targeted July 2026), so the entire spec was reverse-engineered from his 5 YouTube videos (frames + transcripts), repo assets, and a web sweep — then adversarially verified (122/125 claims CONFIRMED).
+The original repo ([bilawalsidhu/gods-eye-view](https://github.com/bilawalsidhu/gods-eye-view)) is a placeholder with no code (release targeted July 2026), so the entire spec was reverse-engineered from his 5 YouTube videos (frames + transcripts), repo assets, and a web sweep — then adversarially verified (122/125 claims CONFIRMED).
+
+## Build status
+
+**M0 (skeleton) done** — CesiumJS globe, basemap switching (GOOGLE 3D / AERIAL + LBL / ROAD), USGS earthquakes layer end-to-end with 1-min refresh. Runs keyless (2D fallback); add a Google Map Tiles key or Cesium ion token in `.env` (copy `.env.example`) for photorealistic 3D tiles. Next: M1 per [06-roadmap](docs/06-roadmap.md).
+
+```sh
+npm install
+npm run dev        # http://localhost:5173
+npm test           # feed-normalize unit tests
+npm run build && npm run preview
+node scripts/verify-m0.mjs   # headless Edge smoke: basemap active + quakes rendered + screenshot
+```
 
 ## Docs
 
