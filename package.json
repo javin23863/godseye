@@ -10,7 +10,8 @@
     "test": "node --test \"tests/*.test.mjs\""
   },
   "dependencies": {
-    "cesium": "^1.126.0"
+    "cesium": "^1.126.0",
+    "satellite.js": "^5.0.0"
   },
   "devDependencies": {
     "puppeteer-core": "^25.3.0",

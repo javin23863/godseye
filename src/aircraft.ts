@@ -23,7 +23,7 @@ export class AircraftLayer {
     viewer: Viewer,
     name: string,
     private opts: {
-      url: string
+      urls: string[] // tried in order — community feeds 502 without warning, keep a mirror
       normalize: (body: never) => Aircraft[] // JSDoc'd .mjs normalizers narrow their own input
       pollMs: number
       color: Color
@@ -49,9 +49,19 @@ export class AircraftLayer {
 
   async refresh() {
     try {
-      const res = await fetch(this.opts.url)
-      if (!res.ok) throw new Error(`${this.opts.url} -> ${res.status}`)
-      const craft = this.opts.normalize((await res.json()) as never).slice(0, ENTITY_CAP)
+      let body: unknown = null
+      for (const url of this.opts.urls) {
+        try {
+          const res = await fetch(url)
+          if (!res.ok) throw new Error(`${url} -> ${res.status}`)
+          body = await res.json()
+          break
+        } catch (e) {
+          console.warn(`${this.ds.name}: ${url} failed, trying next mirror:`, e)
+        }
+      }
+      if (body === null) throw new Error('all mirrors failed')
+      const craft = this.opts.normalize(body as never).slice(0, ENTITY_CAP)
       this.ds.entities.suspendEvents()
       this.ds.entities.removeAll()
       for (const a of craft) {

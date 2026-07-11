@@ -6,6 +6,7 @@ export interface PanelLayer {
 export function addLayerRow(name: string, layer: PanelLayer): (count: number) => void {
   const layersDiv = document.getElementById('layers')!
   const label = document.createElement('label')
+  label.className = 'layer-row'
   const box = document.createElement('input')
   box.type = 'checkbox'
   box.checked = layer.shown

@@ -14,23 +14,39 @@ const browser = await puppeteer.launch({
 })
 const page = await browser.newPage()
 await page.setViewport({ width: 1400, height: 900 })
+// Optional TLE cache seed (CelesTrak throttles group downloads to ~1/2h per IP,
+// so CI-ish runs exercise the localStorage cache path instead of the network).
+if (process.env.M0_TLE_FILE) {
+  const text = await (await import('node:fs/promises')).readFile(process.env.M0_TLE_FILE, 'utf-8')
+  await page.evaluateOnNewDocument(
+    (payload) => localStorage.setItem('godseye-tle-active', payload),
+    JSON.stringify({ at: Date.now(), text }),
+  )
+}
 const logs = []
 page.on('console', (m) => logs.push(`${m.type()}: ${m.text()}`))
 page.on('pageerror', (e) => logs.push(`pageerror: ${e.message}`))
 
 await page.goto(URL, { waitUntil: 'networkidle2', timeout: 90_000 })
 // every layer row shows a count once its first fetch lands
-await page.waitForFunction(
-  () => [...document.querySelectorAll('#layers .count')].every((c) => /\d/.test(c.textContent ?? '')),
-  { timeout: 120_000 },
-)
+try {
+  await page.waitForFunction(
+    () => {
+      const rows = document.querySelectorAll('#layers label.layer-row .count')
+      return rows.length > 0 && [...rows].every((c) => /\d/.test(c.textContent ?? ''))
+    },
+    { timeout: 120_000 },
+  )
+} catch {
+  console.warn('timeout waiting for all layer counts — reporting partial state')
+}
 // let imagery tiles stream in
 await new Promise((r) => setTimeout(r, 20_000))
 
 const state = await page.evaluate(() => ({
   activeBasemap: document.querySelector('#basemaps button.active')?.textContent ?? null,
   layers: Object.fromEntries(
-    [...document.querySelectorAll('#layers label')].map((l) => [
+    [...document.querySelectorAll('#layers label.layer-row')].map((l) => [
       l.textContent?.replace(/\d+\s*$/, '').trim(),
       Number(l.querySelector('.count')?.textContent ?? 0),
     ]),

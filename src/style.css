@@ -28,3 +28,9 @@ body { font-family: "Cascadia Mono", Consolas, monospace; color: #cfd8dc; }
 #panel button.active { color: #4fc3f7; }
 #panel button:hover, #panel label:hover { color: #fff; }
 #panel .count { color: #ffb74d; float: right; }
+
+#status {
+  position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+  font-size: 11px; letter-spacing: 2px; color: #ffb74d;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.9); pointer-events: none;
+}
