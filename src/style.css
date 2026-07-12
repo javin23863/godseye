@@ -444,3 +444,22 @@ body.clean-ui #windy-pip { display: none !important; }
 #wx-loc { color: #546e7a; font-size: 9px; letter-spacing: 1px; }
 #wx-now { color: #ffab40; font-size: 10px; letter-spacing: 0.5px; margin: 2px 0; }
 #wx-spark { display: block; }
+
+/* -- animated weather map (Windy Map-Forecast): iframe panel ----------------- */
+#windy-map-toggle {
+  font: inherit; font-size: 10px; letter-spacing: 1px; color: #78909c;
+  background: none; border: 1px solid #263238; border-radius: 3px;
+  padding: 2px 6px; margin: 6px 0 0 0; cursor: pointer; display: block;
+}
+#windy-map-toggle:hover { color: #ffab40; border-color: #ffab40; }
+#windy-map {
+  display: none; position: absolute; bottom: 74px; right: 16px; width: 480px; height: 340px;
+  background: rgba(8, 14, 18, 0.92); border: 1px solid #263238; border-radius: 6px;
+  padding: 6px; z-index: 6; font-size: 10px; letter-spacing: 1px;
+  resize: both; overflow: hidden; min-width: 320px; min-height: 220px;
+}
+#windy-map-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; color: #4fc3f7; }
+#windy-map-close { background: none; border: none; color: #78909c; font-size: 14px; cursor: pointer; line-height: 1; }
+#windy-map-close:hover { color: #fff; }
+#windy-map-frame { width: 100%; height: calc(100% - 20px); border: 1px solid #263238; border-radius: 3px; background: #000; }
+body.clean-ui #windy-map { display: none !important; }

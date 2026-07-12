@@ -47,6 +47,39 @@ function windyWeather(key: string): Plugin {
   }
 }
 
+// Windy Map-Forecast is a client-side Leaflet lib that REQUIRES the key in windyInit()
+// (that's the product design — map keys are domain-restricted). To keep the key out of
+// the repo and the built bundle, the app iframes this proxy-served page instead: the key
+// is injected into the HTML server-side from .env at request time.
+function windyMap(key: string): Plugin {
+  const handler = (req: IncomingMessage, res: ServerResponse) => {
+    const u = new URL(req.url ?? '', 'http://x')
+    const num = (name: string, dflt: number) => {
+      const v = Number(u.searchParams.get(name))
+      return Number.isFinite(v) ? v : dflt
+    }
+    const overlay = /^[a-zA-Z]+$/.test(u.searchParams.get('overlay') ?? '') ? u.searchParams.get('overlay') : 'wind'
+    res.writeHead(200, { 'content-type': 'text/html', 'x-windy-map': '1' })
+    res.end(`<!doctype html><html><head><meta charset="utf-8">
+<style>html,body{margin:0;height:100%;background:#000}#windy{width:100%;height:100%}</style>
+<script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js"></script>
+<script src="https://api.windy.com/assets/map-forecast/libBoot.js"></script>
+</head><body><div id="windy"></div><script>
+windyInit({ key: ${JSON.stringify(key)}, lat: ${num('lat', 26.5)}, lon: ${num('lon', 56.3)}, zoom: ${num('zoom', 5)}, overlay: ${JSON.stringify(overlay)} },
+  function () { document.title = 'WINDY-MAP-OK' })
+</script></body></html>`)
+  }
+  return {
+    name: 'windy-map-page',
+    configureServer(s) {
+      s.middlewares.use('/feeds/windymap', handler)
+    },
+    configurePreviewServer(s) {
+      s.middlewares.use('/feeds/windymap', handler)
+    },
+  }
+}
+
 // OpenSky + the military-ADS-B mirrors don't serve CORS headers for third-party
 // origins, so the app calls same-origin /feeds/* and vite proxies (dev AND preview).
 // A production deploy needs the same routes on its host (thin proxy, docs/02).
@@ -106,6 +139,7 @@ export default defineConfig(({ mode }) => {
   }
   const plugins: Plugin[] = [cesium()]
   if (env.WINDY_POINT_FORECAST_KEY) plugins.push(windyWeather(env.WINDY_POINT_FORECAST_KEY))
+  if (env.WINDY_MAP_KEY) plugins.push(windyMap(env.WINDY_MAP_KEY))
   return {
     plugins,
     server: { proxy },

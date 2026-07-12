@@ -74,6 +74,7 @@ function loadKey(name) {
 let OLLAMA_API_KEY = null // resolved in createWindow (after app is ready, so getPath works)
 let WINDY_API_KEY = null
 let WINDY_PF_KEY = null // Windy Point-Forecast (weather) — separate product/key from webcams
+let WINDY_MAP_KEY = null // Windy Map-Forecast (animated overlay) — third separate product/key
 
 const MIME = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css',
@@ -158,6 +159,30 @@ function proxyWeather(req, res, u) {
   preq.end(body)
 }
 
+// Windy Map-Forecast page: the lib needs the key in windyInit() client-side (product
+// design; map keys are domain-restricted), so serve the page with the key injected here
+// from .env — never from the built bundle. Mirrors vite.config.ts's windyMap plugin.
+function serveWindyMap(res, u) {
+  if (!WINDY_MAP_KEY) {
+    res.writeHead(404)
+    return res.end('no map-forecast key')
+  }
+  const num = (name, dflt) => {
+    const v = Number(u.searchParams.get(name))
+    return Number.isFinite(v) ? v : dflt
+  }
+  const overlay = /^[a-zA-Z]+$/.test(u.searchParams.get('overlay') ?? '') ? u.searchParams.get('overlay') : 'wind'
+  res.writeHead(200, { 'content-type': 'text/html', 'x-windy-map': '1' })
+  res.end(`<!doctype html><html><head><meta charset="utf-8">
+<style>html,body{margin:0;height:100%;background:#000}#windy{width:100%;height:100%}</style>
+<script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js"></script>
+<script src="https://api.windy.com/assets/map-forecast/libBoot.js"></script>
+</head><body><div id="windy"></div><script>
+windyInit({ key: ${JSON.stringify(WINDY_MAP_KEY)}, lat: ${num('lat', 26.5)}, lon: ${num('lon', 56.3)}, zoom: ${num('zoom', 5)}, overlay: ${JSON.stringify(overlay)} },
+  function () { document.title = 'WINDY-MAP-OK' })
+</script></body></html>`)
+}
+
 function serveStatic(req, res, u) {
   let rel = decodeURIComponent(u.pathname)
   if (rel === '/' || rel === '') rel = '/index.html'
@@ -188,6 +213,7 @@ function startServer() {
     const server = http.createServer((req, res) => {
       const u = new URL(req.url, 'http://127.0.0.1')
       if (u.pathname === '/feeds/weather') return proxyWeather(req, res, u) // POST-body key inject
+      if (u.pathname === '/feeds/windymap') return serveWindyMap(res, u) // keyed HTML page
       const route = ROUTES.find((r) => u.pathname === r.prefix) // exact match: /feeds/mil !== /feeds/mil2
       if (route) return proxyFeed(route, req, res, u)
       serveStatic(req, res, u)
@@ -288,6 +314,7 @@ async function createWindow() {
   OLLAMA_API_KEY = loadKey('OLLAMA_API_KEY')
   WINDY_API_KEY = loadKey('WINDY_API_KEY')
   WINDY_PF_KEY = loadKey('WINDY_POINT_FORECAST_KEY')
+  WINDY_MAP_KEY = loadKey('WINDY_MAP_KEY')
   buildMenu()
 
   const saved = onScreen(loadState())
