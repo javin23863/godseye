@@ -1,8 +1,32 @@
 // Aircraft layers (CAP-08 commercial, CAP-09 military): poll -> normalize -> point entities.
 // ponytail: main-thread parse + hard entity cap; move to a worker + clustering when
 // profiling shows jank (M1 engine rule will formalize).
-import { Cartesian3, Color, CustomDataSource, Viewer, Cartesian2, DistanceDisplayCondition } from 'cesium'
+import {
+  Cartesian3,
+  Color,
+  CustomDataSource,
+  Viewer,
+  Cartesian2,
+  DistanceDisplayCondition,
+  Math as CMath,
+  NearFarScalar,
+  PolylineGlowMaterialProperty,
+} from 'cesium'
 import { record } from './recorder'
+
+// White glyph pointing north; billboard `color` tints it per-layer. rotation = -heading
+// with alignedAxis Z reads correctly top-down (approximate at steep tilts — HUD trade).
+const PLANE_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">' +
+  '<path fill="#fff" d="M12 0l1.8 7.2 9.2 5v2l-9-2.6-.6 6.4 3.4 2.8V23l-4.8-1.4L7.2 23v-2.2l3.4-2.8-.6-6.4-9 2.6v-2l9.2-5z"/></svg>'
+const PLANE_URI = 'data:image/svg+xml,' + encodeURIComponent(PLANE_SVG)
+const TRAIL_LEN = 10 // fixes per aircraft (~10 min at the mil 60s poll)
+
+/** Altitude -> hue ramp: warm on the deck, blue at cruise. */
+function altColor(altM: number): Color {
+  const t = Math.min(Math.max(altM / 13_000, 0), 1)
+  return Color.fromHsl(0.08 + 0.58 * t, 0.9, 0.55)
+}
 
 export interface Aircraft {
   id: string
@@ -29,6 +53,7 @@ export class AircraftLayer {
       pollMs: number
       color: Color
       labels?: boolean
+      trails?: boolean // glow trails need a fast poll; useless at the 15-min flights cadence
     },
     private onUpdate: (count: number) => void,
   ) {
@@ -73,14 +98,44 @@ export class AircraftLayer {
     }
   }
 
+  // last few rendered positions per aircraft — replays through renderItems too, so the
+  // 4D playhead grows trails from whatever frames it paints (scrub-backwards looks odd; fine)
+  private history = new Map<string, Cartesian3[]>()
+
   renderItems(craft: Aircraft[]) {
     this.ds.entities.suspendEvents()
     this.ds.entities.removeAll()
+    const seen = new Set<string>()
     for (const a of craft) {
+      const pos = Cartesian3.fromDegrees(a.lon, a.lat, Math.max(0, a.altM))
+      if (this.opts.trails) {
+        seen.add(a.id)
+        const h = this.history.get(a.id) ?? []
+        h.push(pos)
+        if (h.length > TRAIL_LEN) h.shift()
+        this.history.set(a.id, h)
+        if (h.length >= 2)
+          this.ds.entities.add({
+            id: `${a.id}-trail`,
+            polyline: {
+              positions: [...h],
+              width: 6,
+              material: new PolylineGlowMaterialProperty({ glowPower: 0.25, color: altColor(a.altM).withAlpha(0.8) }),
+            },
+          })
+      }
       this.ds.entities.add({
         id: a.id,
-        position: Cartesian3.fromDegrees(a.lon, a.lat, Math.max(0, a.altM)),
-        point: { pixelSize: 3, color: this.opts.color },
+        position: pos,
+        billboard: {
+          image: PLANE_URI,
+          color: this.opts.color,
+          width: 18,
+          height: 18,
+          rotation: CMath.toRadians(-a.heading),
+          alignedAxis: Cartesian3.UNIT_Z,
+          scaleByDistance: new NearFarScalar(1e4, 1.1, 8e6, 0.45),
+        },
         label: this.opts.labels
           ? {
               text: a.callsign,
@@ -95,6 +150,7 @@ export class AircraftLayer {
         description: `${a.callsign} · alt ${Math.round(a.altM)} m · hdg ${Math.round(a.heading)}°`,
       })
     }
+    for (const k of this.history.keys()) if (!seen.has(k)) this.history.delete(k) // gone from feed -> drop trail
     this.ds.entities.resumeEvents()
     this.count = craft.length
     this.onUpdate(this.count)

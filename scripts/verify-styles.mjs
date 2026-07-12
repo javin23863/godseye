@@ -24,7 +24,7 @@ page.on('pageerror', (e) => errors.push(e.message))
 await page.goto(URL, { waitUntil: 'networkidle2', timeout: 90_000 })
 await new Promise((r) => setTimeout(r, 15_000)) // let the globe render
 
-const presets = ['NORMAL', 'CRT', 'NVG', 'FLIR', 'ANIME', 'NOIR']
+const presets = ['NORMAL', 'CRT', 'NVG', 'FLIR', 'ANIME', 'NOIR', 'IRONBOW', 'DUSK', 'CINEMA']
 for (let i = 0; i < presets.length; i++) {
   await page.keyboard.press(String(i + 1))
   await new Promise((r) => setTimeout(r, 2_500))

@@ -1,6 +1,7 @@
 // Earthquake layer (CAP-17, DS-08): USGS all_day GeoJSON, keyless, refreshed every minute.
 // The M0 proof of the layer pipeline: fetch -> normalize -> entities -> toggle -> attribution.
-import { Cartesian3, Color, CustomDataSource, Viewer } from 'cesium'
+import { CallbackProperty, Cartesian3, Color, CustomDataSource, Viewer } from 'cesium'
+import type { Property } from 'cesium'
 import { normalizeQuakes } from './quakes-normalize.mjs'
 import { record } from './recorder'
 
@@ -62,19 +63,35 @@ export class QuakeLayer {
 
   renderItems(quakes: Quake[]) {
     this.ds.entities.removeAll()
-    for (const q of quakes) {
+    quakes.forEach((q, i) => {
+      const base = 4 + Math.max(0, q.mag) * 2
       this.ds.entities.add({
         id: q.id,
         position: Cartesian3.fromDegrees(q.lon, q.lat),
         point: {
-          pixelSize: 4 + Math.max(0, q.mag) * 2,
+          // sonar pulse — per-point CallbackProperty is cheap (billboard size, no geometry rebuild)
+          pixelSize: new CallbackProperty(() => base + 1.5 + 1.5 * Math.sin(performance.now() / 300 + i), false) as unknown as Property,
           color: Color.ORANGERED.withAlpha(0.85),
           outlineColor: Color.YELLOW.withAlpha(0.6),
           outlineWidth: 1,
         },
         description: `M${q.mag} — ${q.place}<br>${new Date(q.time).toISOString()} · depth ${q.depthKm} km`,
       })
-    }
+      if (q.mag >= 4)
+        // static impact ring scaled by magnitude (animated ellipses rebuild geometry per frame — not worth it)
+        this.ds.entities.add({
+          id: `${q.id}-ring`,
+          position: Cartesian3.fromDegrees(q.lon, q.lat),
+          ellipse: {
+            semiMajorAxis: q.mag * 15_000,
+            semiMinorAxis: q.mag * 15_000,
+            material: Color.ORANGERED.withAlpha(0.1),
+            outline: true,
+            outlineColor: Color.ORANGERED.withAlpha(0.5),
+            height: 0,
+          },
+        })
+    })
     this.count = quakes.length
     this.last = quakes
     this.onUpdate(this.count)

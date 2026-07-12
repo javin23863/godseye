@@ -3,6 +3,26 @@
 html, body, #cesiumContainer { width: 100%; height: 100%; overflow: hidden; background: #000; }
 body { font-family: "Cascadia Mono", Consolas, monospace; color: #cfd8dc; }
 
+/* full-screen vignette + faint scanlines over the scene, under the HUD (later DOM siblings win) */
+#cesiumContainer::after {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.38) 100%),
+    repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, 0.05) 2px 4px);
+}
+
+/* boot splash: typewriter status, fades out */
+#boot {
+  position: fixed; inset: 0; z-index: 20; background: #000;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.8s;
+}
+#boot.done { opacity: 0; pointer-events: none; }
+#boot pre {
+  font: 12px/2 "Cascadia Mono", Consolas, monospace; color: #4fc3f7;
+  letter-spacing: 3px; text-shadow: 0 0 8px rgba(79, 195, 247, 0.5);
+}
+
 #brand {
   position: absolute; top: 12px; left: 16px; pointer-events: none;
   text-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
@@ -14,11 +34,35 @@ body { font-family: "Cascadia Mono", Consolas, monospace; color: #cfd8dc; }
 #panel {
   position: absolute; top: 80px; left: 16px; width: 190px;
   display: flex; flex-direction: column; gap: 10px;
+  /* long layer roster must scroll, not run under the style dock / off-screen */
+  max-height: calc(100vh - 220px); overflow-y: auto; overflow-x: hidden;
+  scrollbar-width: thin; scrollbar-color: #263238 transparent;
 }
 #panel section {
-  background: rgba(8, 14, 18, 0.82); border: 1px solid #263238;
+  background: rgba(8, 14, 18, 0.72); border: 1px solid #263238;
   border-radius: 6px; padding: 8px 10px;
+  position: relative; backdrop-filter: blur(6px);
 }
+/* cyan corner brackets, targeting-display style */
+#panel section::before, #panel section::after {
+  content: ''; position: absolute; width: 9px; height: 9px; pointer-events: none; opacity: 0.65;
+}
+#panel section::before { top: -1px; left: -1px; border-top: 1px solid #4fc3f7; border-left: 1px solid #4fc3f7; }
+#panel section::after { bottom: -1px; right: -1px; border-bottom: 1px solid #4fc3f7; border-right: 1px solid #4fc3f7; }
+
+/* frosted glass on every floating dock/panel */
+#style-dock, #timeline, #gate-panel, #oil-panel, #pol-panel, #brief-panel, #analyst,
+#cctv-pip, #windy-pip, #windy-map, #share-bar button, #voice-toggle, #kiosk-toggle, #brief-btn {
+  backdrop-filter: blur(6px);
+}
+
+/* layer counts flash amber->white on change */
+.count.flash { animation: count-flash 0.6s ease-out; }
+@keyframes count-flash { 0% { color: #fff; text-shadow: 0 0 6px #4fc3f7; } 100% { color: #ffb74d; } }
+
+/* blinking LIVE dot ahead of the REC clock */
+#hud-rec:not(:empty)::before { content: '● '; color: #ff5252; animation: rec-blink 1.6s step-end infinite; }
+@keyframes rec-blink { 50% { opacity: 0.15; } }
 #panel h2 { font-size: 10px; letter-spacing: 3px; color: #78909c; margin-bottom: 6px; }
 #panel button, #panel label {
   display: block; width: 100%; text-align: left; font: inherit; font-size: 11px;
@@ -59,9 +103,10 @@ body { font-family: "Cascadia Mono", Consolas, monospace; color: #cfd8dc; }
   background: rgba(8, 14, 18, 0.82); border: 1px solid #263238;
   border-radius: 6px; padding: 8px 10px; font-size: 10px; letter-spacing: 2px;
 }
+#style-presets { display: flex; flex-wrap: wrap; gap: 4px; max-width: 300px; } /* 9 presets now — wrap */
 #style-presets button {
   font: inherit; color: #cfd8dc; background: none; border: 1px solid #263238;
-  border-radius: 3px; padding: 3px 7px; margin-right: 4px; cursor: pointer;
+  border-radius: 3px; padding: 3px 7px; cursor: pointer;
 }
 #style-presets button.active { color: #4fc3f7; border-color: #4fc3f7; }
 #fx-controls { margin-top: 6px; display: flex; gap: 10px; align-items: center; color: #78909c; }

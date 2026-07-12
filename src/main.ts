@@ -11,6 +11,7 @@ import {
   defined,
 } from 'cesium'
 import { setBasemap, type BasemapMode } from './basemaps'
+import { addNightLights, bootSplash, initReticle, initScene } from './visuals'
 import { QuakeLayer } from './quakes'
 import { AircraftLayer } from './aircraft'
 import { SatelliteLayer } from './satellites'
@@ -62,8 +63,14 @@ const viewer = new Viewer('cesiumContainer', {
   sceneModePicker: false,
   navigationHelpButton: false,
   baseLayer: false,
+  shadows: true, // sun shadows on 3D tiles/entities, sun tracks the 4D clock
 })
 viewer.scene.globe.baseColor = viewer.scene.backgroundColor
+initScene(viewer) // lighting/terminator, HDR, MSAA, soft shadows, mild bloom
+bootSplash()
+const reticle = initReticle(viewer)
+const nightLights = addNightLights(viewer)
+;(window as { __viewer?: Viewer } & Window).__viewer = viewer // verify-scripts / devtools hook
 
 // -- basemap switcher (CAP-03) --------------------------------------------
 const MODES: { mode: BasemapMode; label: string }[] = [
@@ -87,6 +94,19 @@ for (const { mode, label } of MODES) {
 ;(basemapDiv.querySelector('button[data-mode="google3d"]') as HTMLButtonElement).click()
 
 // -- data layers (CAP-07 / CAP-08 / CAP-09 / CAP-17) ----------------------
+addLayerRow(
+  'NIGHT LIGHTS',
+  {
+    get shown() {
+      return nightLights.show
+    },
+    set shown(v: boolean) {
+      nightLights.show = v
+    },
+  },
+  { noCount: true }, // imagery overlay — fades in on the dark side of the terminator
+)
+
 let setQuakeCount: (n: number) => void
 const quakes = new QuakeLayer(viewer, (n) => setQuakeCount(n))
 setQuakeCount = addLayerRow('EARTHQUAKES 24H', quakes)
@@ -123,6 +143,7 @@ const military = new AircraftLayer(
     pollMs: 60_000,
     color: Color.ORANGE,
     labels: true,
+    trails: true, // 60s cadence is dense enough for altitude-colored glow trails
   },
   (n) => setMilCount(n),
 )
@@ -263,8 +284,9 @@ PRESETS.forEach((p, i) => {
   presetsDiv.appendChild(btn)
 })
 setPreset('NORMAL')
-;(document.getElementById('fx-bloom') as HTMLInputElement).onchange = (e) =>
-  fx.setBloom((e.target as HTMLInputElement).checked)
+const bloomBox = document.getElementById('fx-bloom') as HTMLInputElement
+bloomBox.checked = true // initScene enables mild bloom by default
+bloomBox.onchange = (e) => fx.setBloom((e.target as HTMLInputElement).checked)
 ;(document.getElementById('fx-sharpen') as HTMLInputElement).oninput = (e) => {
   fx.sharpen = Number((e.target as HTMLInputElement).value) / 100
   fx.refresh()
@@ -710,6 +732,10 @@ initVoice(
 new ScreenSpaceEventHandler(viewer.scene.canvas).setInputAction((click: { position: import('cesium').Cartesian2 }) => {
   const picked = viewer.scene.pick(click.position)
   const id: string | undefined = defined(picked) ? picked.id?.id : undefined
+  if (typeof id === 'string' && id.endsWith('-trail')) return // glow trails aren't inspectable
+  // pulsing target-lock reticle on anything inspectable
+  const RETICLE_PREFIXES = ['sat-', 'os-', 'mil-', 'ship-', 'cctv-', 'news-', 'wcam-', 'fx-']
+  reticle.lock(typeof id === 'string' && RETICLE_PREFIXES.some((p) => id.startsWith(p)) ? picked.id : undefined)
   // pattern-of-life (additive): profile any tracked entity / AOI marker alongside its normal action
   if (PolLayer.handles(id)) void pol.inspect(picked.id)
   else pol.hide()

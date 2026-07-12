@@ -9,9 +9,18 @@ import {
   CustomDataSource,
   DistanceDisplayCondition,
   Math as CMath,
+  NearFarScalar,
+  PolylineGlowMaterialProperty,
   Viewer,
 } from 'cesium'
 import { record } from './recorder'
+
+// White hull pointing north; billboard `color` tints moving vs anchored.
+const HULL_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">' +
+  '<path fill="#fff" d="M12 1l5 7v13q-5 3-10 0V8z"/></svg>'
+const HULL_URI = 'data:image/svg+xml,' + encodeURIComponent(HULL_SVG)
+const TRAIL_LEN = 20 // fixes per moving ship (~100 s at the 5 s render tick)
 
 const WS_URL = 'wss://stream.aisstream.io/v0/stream'
 const KEY = import.meta.env.VITE_AISSTREAM_KEY as string | undefined
@@ -139,18 +148,43 @@ export class ShipLayer {
     this.renderItems([...this.ships.values()])
   }
 
+  // wake trails: last rendered fixes per moving ship (playback frames grow trails too)
+  private history = new Map<number, Cartesian3[]>()
+
   renderItems(ships: Ship[]) {
     this.ds.entities.suspendEvents()
     this.ds.entities.removeAll()
+    const seen = new Set<number>()
     for (const s of ships) {
+      const pos = Cartesian3.fromDegrees(s.lon, s.lat)
+      const moving = s.sog > 0.5
+      if (moving) {
+        seen.add(s.mmsi)
+        const h = this.history.get(s.mmsi) ?? []
+        h.push(pos)
+        if (h.length > TRAIL_LEN) h.shift()
+        this.history.set(s.mmsi, h)
+        if (h.length >= 2)
+          this.ds.entities.add({
+            id: `ship-${s.mmsi}-trail`,
+            polyline: {
+              positions: [...h],
+              width: 5,
+              material: new PolylineGlowMaterialProperty({ glowPower: 0.2, color: Color.SPRINGGREEN.withAlpha(0.6) }),
+            },
+          })
+      }
       this.ds.entities.add({
         id: `ship-${s.mmsi}`,
-        position: Cartesian3.fromDegrees(s.lon, s.lat),
-        point: {
-          pixelSize: 4,
-          color: s.sog > 0.5 ? Color.SPRINGGREEN : Color.LIGHTSLATEGRAY, // moving vs anchored/parked
-          outlineColor: Color.BLACK.withAlpha(0.5),
-          outlineWidth: 1,
+        position: pos,
+        billboard: {
+          image: HULL_URI,
+          color: moving ? Color.SPRINGGREEN : Color.LIGHTSLATEGRAY, // moving vs anchored/parked
+          width: 13,
+          height: 13,
+          rotation: CMath.toRadians(-s.heading),
+          alignedAxis: Cartesian3.UNIT_Z,
+          scaleByDistance: new NearFarScalar(5e3, 1.2, 3e6, 0.5),
         },
         label: {
           text: s.name,
@@ -163,6 +197,7 @@ export class ShipLayer {
         description: `${s.name} · MMSI ${s.mmsi}<br>SOG ${s.sog.toFixed(1)} kn · COG ${s.cog.toFixed(0)}° · HDG ${s.heading}°<br>${new Date(s.at).toISOString()}`,
       })
     }
+    for (const k of this.history.keys()) if (!seen.has(k)) this.history.delete(k) // stale/anchored -> drop wake
     this.ds.entities.resumeEvents()
     this.count = ships.length
     this.onUpdate(this.count)

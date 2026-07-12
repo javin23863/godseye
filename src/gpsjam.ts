@@ -106,12 +106,16 @@ export class GpsJamLayer {
     this.ds.entities.suspendEvents()
     this.ds.entities.removeAll()
     cells.forEach((c, i) => {
+      const sev = Color.lerp(Color.YELLOW, Color.RED, c.frac, new Color()) // severity ramp
       this.ds.entities.add({
         id: `jam-${i}`,
         rectangle: {
           coordinates: Rectangle.fromDegrees(c.lon, c.lat, c.lon + CELL_DEG, c.lat + CELL_DEG),
-          material: Color.RED.withAlpha(0.25 + 0.5 * c.frac),
+          material: sev.withAlpha(0.25 + 0.4 * c.frac),
           height: 0,
+          extrudedHeight: 3_000 + 45_000 * c.frac, // prism height = severity, reads on the 4D timeline
+          outline: true,
+          outlineColor: sev.withAlpha(0.8),
         },
         description: `GPS jamming cell<br>${c.low}/${c.total} low-integrity (${Math.round(c.frac * 100)}%)`,
       })

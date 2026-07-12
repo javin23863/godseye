@@ -2,13 +2,13 @@
 // post-process stages. FLIR/NVG are stylized looks, not real sensor data (04-ui-spec).
 import { PostProcessStage, Viewer } from 'cesium'
 
-export const PRESETS = ['NORMAL', 'CRT', 'NVG', 'FLIR', 'ANIME', 'NOIR'] as const
+export const PRESETS = ['NORMAL', 'CRT', 'NVG', 'FLIR', 'ANIME', 'NOIR', 'IRONBOW', 'DUSK', 'CINEMA'] as const
 export type Preset = (typeof PRESETS)[number]
 
-// One fragment shader, branched by u_mode — avoids six near-identical stages.
+// One fragment shader, branched by u_mode — avoids nine near-identical stages.
 const FX_SHADER = /* glsl */ `
 uniform sampler2D colorTexture;
-uniform float u_mode;      // 0 normal, 1 crt, 2 nvg, 3 flir, 4 anime, 5 noir
+uniform float u_mode;      // 0 normal, 1 crt, 2 nvg, 3 flir, 4 anime, 5 noir, 6 ironbow, 7 dusk, 8 cinema
 uniform float u_pixelate;  // 0..1
 uniform float u_sharpen;   // 0..1
 uniform float u_time;
@@ -66,6 +66,26 @@ void main() {
     float l = luma(c);
     l = smoothstep(0.15, 0.85, l);
     c = vec3(l) + (hash(uv * (u_time + 3.0)) - 0.5) * 0.06;
+  } else if (mode == 6) { // IRONBOW: thermal false-color (black-purple-red-orange-yellow-white)
+    float l = pow(luma(c), 0.85);
+    c = clamp(vec3(
+      1.5 * pow(l, 0.7),
+      1.6 * pow(l, 2.0) - 0.2,
+      mix(0.9 * pow(1.0 - l, 1.5) * smoothstep(0.0, 0.3, l), 1.0, smoothstep(0.85, 1.0, l))
+    ), 0.0, 1.0);
+    c += (hash(uv * (u_time + 5.0)) - 0.5) * 0.03;
+  } else if (mode == 7) { // DUSK: teal shadows / orange highlights, soft contrast
+    float l = luma(c);
+    c = mix(c, vec3(l), 0.25);
+    c += mix(vec3(-0.06, 0.03, 0.10), vec3(0.14, 0.05, -0.08), smoothstep(0.15, 0.85, l));
+    c = clamp(c, 0.0, 1.0);
+    c = c * c * (3.0 - 2.0 * c);
+  } else if (mode == 8) { // CINEMA: letterbox + warm print + grain + gentle S-curve
+    c = clamp(c, 0.0, 1.0);
+    c = mix(c, c * c * (3.0 - 2.0 * c), 0.6);
+    c *= vec3(1.04, 1.0, 0.96);
+    c += (hash(uv * (u_time + 11.0)) - 0.5) * 0.05;
+    if (uv.y < 0.105 || uv.y > 0.895) c = vec3(0.0);
   }
 
   out_FragColor = vec4(c, 1.0);

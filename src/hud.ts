@@ -24,7 +24,8 @@ export function initHud(viewer: Viewer) {
     const carto = viewer.camera.positionCartographic
     posEl.textContent = `${toDms(CMath.toDegrees(carto.latitude), 'N', 'S')} ${toDms(CMath.toDegrees(carto.longitude), 'E', 'W')}`
     const altM = carto.height
-    altEl.textContent = `ALT: ${altM > 100_000 ? `${Math.round(altM / 1000)}KM` : `${Math.round(altM)}M`}  SUN: --`
+    const hdg = String(Math.round(CMath.toDegrees(viewer.camera.heading)) % 360).padStart(3, '0')
+    altEl.textContent = `ALT: ${altM > 100_000 ? `${Math.round(altM / 1000)}KM` : `${Math.round(altM)}M`}  HDG: ${hdg}°`
     recEl.textContent = `REC ${new Date().toISOString().replace('T', ' ').slice(0, 19)}Z`
   })
 }

@@ -2,8 +2,10 @@
 // graceful-fallback rule: no key or tile failure -> 2D aerial, app keeps running.
 import {
   Cesium3DTileset,
+  EllipsoidTerrainProvider,
   ImageryLayer,
   OpenStreetMapImageryProvider,
+  Terrain,
   UrlTemplateImageryProvider,
   Viewer,
   createGooglePhotorealistic3DTileset,
@@ -32,6 +34,17 @@ const ROAD = () => new OpenStreetMapImageryProvider({ url: 'https://tile.openstr
 
 let google3d: Cesium3DTileset | null = null
 let ownLayers: ImageryLayer[] = [] // only remove what we added — overlays (e.g. weather) live in the same collection
+let worldTerrain: Terrain | null = null
+
+/** Real relief under draped imagery; flat ellipsoid under Google 3D (tiles carry their own geometry). */
+function applyTerrain(viewer: Viewer, relief: boolean) {
+  if (relief && ION_TOKEN) {
+    worldTerrain ??= Terrain.fromWorldTerrain()
+    viewer.scene.setTerrain(worldTerrain)
+  } else {
+    viewer.scene.globe.terrainProvider = new EllipsoidTerrainProvider()
+  }
+}
 
 async function loadGoogle3d(viewer: Viewer): Promise<Cesium3DTileset | null> {
   if (google3d) return google3d
@@ -64,10 +77,12 @@ export async function setBasemap(viewer: Viewer, mode: BasemapMode): Promise<Bas
     const tiles = await loadGoogle3d(viewer)
     if (tiles) {
       tiles.show = true
+      applyTerrain(viewer, false)
       return 'google3d'
     }
     mode = 'aerial' // graceful fallback (roadmap risk R1)
   }
+  applyTerrain(viewer, true)
   const base = new ImageryLayer(mode === 'road' ? ROAD() : AERIAL())
   layers.add(base, 0)
   ownLayers.push(base)

@@ -38,7 +38,14 @@ export function addLayerRow(
     const countSpan = document.createElement('span')
     countSpan.className = 'count'
     label.insertBefore(countSpan, solo)
-    update = (count) => (countSpan.textContent = String(count))
+    update = (count) => {
+      const s = String(count)
+      if (s === countSpan.textContent) return
+      countSpan.textContent = s
+      countSpan.classList.remove('flash')
+      void countSpan.offsetWidth // restart the CSS animation
+      countSpan.classList.add('flash')
+    }
   }
   layersDiv.appendChild(label)
   box.onchange = () => (layer.shown = box.checked)

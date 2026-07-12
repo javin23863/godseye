@@ -9,6 +9,7 @@ import {
   CustomDataSource,
   Entity,
   JulianDate,
+  PolylineGlowMaterialProperty,
   Viewer,
 } from 'cesium'
 import * as sat from 'satellite.js'
@@ -143,8 +144,8 @@ export class SatelliteLayer {
     this.orbitEntity = this.ds.entities.add({
       polyline: {
         positions: new CallbackProperty(() => positions, false),
-        width: 1,
-        material: Color.RED.withAlpha(0.7),
+        width: 5,
+        material: new PolylineGlowMaterialProperty({ glowPower: 0.15, color: Color.RED.withAlpha(0.8) }),
       },
     })
     const altKm = Cartesian3.magnitude(positions[0]) / 1000 - 6371

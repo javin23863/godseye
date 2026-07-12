@@ -3,7 +3,7 @@
 // the CITIES POI tour on a ~12s smooth flyTo timer with a minimal cycle ticker.
 // K/Esc exits and restores. fullscreenchange keeps state in sync. No entities.
 import { Cartesian3, Math as CMath, Viewer } from 'cesium'
-import { CITIES } from './scenes'
+import { CITIES, makeOrbit } from './scenes'
 import { buildTour, tourLabel } from './kiosk-core.mjs'
 
 const CYCLE_MS = 12_000
@@ -17,14 +17,24 @@ export function setupKiosk(viewer: Viewer) {
   let timer: number | null = null
   let idx = 0
 
+  // slow cinematic drift while dwelling on a stop (reuses the CAP-46 orbit)
+  const drift = makeOrbit(viewer)
+  const stopDrift = () => {
+    if (drift.active) drift.toggle()
+  }
+
   const flyNext = () => {
     const s = TOUR[idx % TOUR.length]
     ticker.textContent = tourLabel(TOUR, idx)
     idx++
+    stopDrift()
     viewer.camera.flyTo({
       destination: Cartesian3.fromDegrees(s.lon, s.lat, s.range),
       orientation: { heading: 0, pitch: CMath.toRadians(-40), roll: 0 },
       duration: 4,
+      complete: () => {
+        if (document.body.classList.contains('kiosk')) drift.toggle(0.5)
+      },
     })
   }
 
@@ -41,6 +51,7 @@ export function setupKiosk(viewer: Viewer) {
   const exit = () => {
     if (!document.body.classList.contains('kiosk')) return
     document.body.classList.remove('clean-ui', 'kiosk')
+    stopDrift()
     if (timer !== null) {
       window.clearInterval(timer)
       timer = null
