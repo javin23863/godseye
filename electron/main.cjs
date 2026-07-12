@@ -9,11 +9,15 @@
 //
 // The proxy route table mirrors vite.config.ts's feed()/oil/llm config; keep the
 // two in sync (six stable routes).
-const { app, BrowserWindow, Menu, shell, screen } = require('electron')
+const { app, BrowserWindow, Menu, Tray, shell, screen, nativeImage } = require('electron')
 const http = require('node:http')
 const https = require('node:https')
 const fs = require('node:fs')
 const path = require('node:path')
+
+// Windows toast identity for tripwire notifications — must be set before any window,
+// else Action Center shows the toast under a generic "electron.app.*" name.
+if (process.platform === 'win32') app.setAppUserModelId('com.javin23863.godseye')
 
 // FIXED port (not listen(0)): Chromium keys IndexedDB + localStorage by origin
 // (scheme://host:PORT). A random port would mint a new origin every launch and
@@ -202,6 +206,30 @@ function buildMenu() {
 
 let win
 let server
+let tray
+
+// Tray + minimize-to-tray: closing the window HIDES it so the sentinel keeps watching
+// (tripwires evaluate on a renderer timer that runs while hidden); only tray→Quit really exits.
+function setupTray() {
+  if (tray) return
+  const img = fs.existsSync(ICON) ? ICON : nativeImage.createEmpty()
+  tray = new Tray(img)
+  tray.setToolTip("God's Eye — sentinel watching")
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: "Show God's Eye", click: () => showWindow() },
+      { type: 'separator' },
+      { label: 'Quit', click: () => { app.isQuitting = true; app.quit() } },
+    ]),
+  )
+  tray.on('click', showWindow)
+}
+function showWindow() {
+  if (!win) return
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+}
 
 function showError(w, msg) {
   w.show()
@@ -221,7 +249,9 @@ async function createWindow() {
     autoHideMenuBar: true,
     show: false, // reveal on ready-to-show to avoid an empty-window flash
     icon: fs.existsSync(ICON) ? ICON : undefined,
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+    // backgroundThrottling off so the tripwire/sentinel timer keeps evaluating at full
+    // cadence while the window is hidden in the tray (Chromium throttles hidden timers).
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false },
   }
   if (saved) {
     opts.x = saved.x
@@ -231,6 +261,13 @@ async function createWindow() {
   if (saved?.maximized) win.maximize()
   win.once('ready-to-show', () => win.show())
   win.on('close', () => saveState(win))
+  setupTray()
+  win.on('close', (e) => {
+    if (!app.isQuitting) {
+      e.preventDefault()
+      win.hide() // sentinel keeps watching from the tray; tray→Quit truly exits
+    }
+  })
 
   // external links (Cesium/ion credit attributions) -> system browser; keep the
   // window pinned to the local origin instead of navigating away into a dead end.
@@ -277,6 +314,7 @@ if (!app.requestSingleInstanceLock()) {
     if (process.platform !== 'darwin') app.quit()
   })
   app.on('before-quit', () => {
+    app.isQuitting = true
     try {
       server?.close()
     } catch {}

@@ -30,6 +30,10 @@ import { initOilPanel } from './oil'
 import { GpsJamLayer } from './gpsjam'
 import { AOILayer } from './aoi'
 import { CctvLayer } from './cctv'
+import { TripwireLayer } from './tripwires'
+import { TRIPWIRE_PRESETS } from './tripwire-core.mjs'
+import { FusionLayer } from './fusion'
+import { PolLayer } from './pol'
 import { normalizeOpenSky, normalizeAdsbMil } from './flights-normalize.mjs'
 import './style.css'
 
@@ -384,6 +388,40 @@ jamAuto.onclick = () => {
   status.textContent = gpsjam.setAuto(on)
 }
 
+// -- tripwires + sentinel (turn the viewer into a watchstander) --------------
+// Arm an AOI + condition; a ~20s timer folds the latest recorded snapshot of every live
+// layer into the rules engine and, on any rising-edge fire, raises a desktop notification +
+// flies to the AOI + captions it. Evaluation runs whenever rules are armed, independent of
+// the row's show toggle (that only hides the rings) — arm it and walk away.
+const twListEl = document.createElement('div')
+twListEl.id = 'tripwire-list'
+let setTwCount: (n: number) => void = () => {}
+const tripwires = new TripwireLayer(
+  viewer,
+  (t) => (status.textContent = t),
+  (n) => setTwCount(n),
+  twListEl,
+)
+setTwCount = addLayerRow('TRIPWIRES', tripwires, { onDemand: true }) // populated by ARM+ADD
+setTwCount(0)
+const twArm = document.createElement('button')
+twArm.id = 'tw-arm'
+twArm.textContent = '└ ARM AOI (2 CLICKS)'
+const twPreset = document.createElement('select')
+twPreset.id = 'tw-preset'
+for (const p of TRIPWIRE_PRESETS) {
+  const o = document.createElement('option')
+  o.value = p.id
+  o.textContent = p.label
+  twPreset.appendChild(o)
+}
+const twAdd = document.createElement('button')
+twAdd.id = 'tw-add'
+twAdd.textContent = '└ ADD TRIPWIRE'
+document.getElementById('layers')!.append(twArm, twPreset, twAdd, twListEl)
+twArm.onclick = () => tripwires.armAoi((t) => (status.textContent = t))
+twAdd.onclick = () => tripwires.addTripwire(twPreset.value, (t) => (status.textContent = t))
+
 // -- 4D playback (M3): record-first, scrub recorded snapshots (incl. GPS-jam evolution) ----
 // After all recording layers (incl. gpsjam) exist, so the playhead can replay every one.
 initPlayback({ flights, military, quakes, sats, ships, gpsjam, onStatus: (t) => (status.textContent = t) })
@@ -431,6 +469,37 @@ cctvDrape.onclick = () => {
   cctvDrape.classList.toggle('active', on)
   status.textContent = cctv.setDrape(on)
 }
+
+// -- cross-layer fusion: co-located multi-INT composite indicators -----------
+// On-demand SCAN. Reads recorded military/quake/gpsjam frames + darkvessel loss points,
+// clusters co-located events spanning >=2 layers, scores them, click = fly-to + LLM "why".
+// After darkvessel + gpsjam exist (it takes the darkvessel ref for AIS-loss points).
+const fusionListEl = document.createElement('div')
+fusionListEl.id = 'fusion-list'
+let setFusionCount: (n: number) => void = () => {}
+const fusion = new FusionLayer(
+  viewer,
+  (n) => setFusionCount(n),
+  (t) => (status.textContent = t),
+  fusionListEl,
+  darkvessel,
+)
+setFusionCount = addLayerRow('FUSION', fusion, { onDemand: true }) // filled by SCAN FUSION
+setFusionCount(0)
+const fusionScan = document.createElement('button')
+fusionScan.id = 'fusion-scan'
+fusionScan.textContent = '└ SCAN FUSION'
+document.getElementById('layers')!.append(fusionScan, fusionListEl)
+fusionScan.onclick = async () => {
+  fusionScan.disabled = true
+  status.textContent = 'FUSION: CORRELATING LAYERS…'
+  status.textContent = await fusion.scan()
+  fusionScan.disabled = false
+}
+
+// -- pattern-of-life: click a tracked entity (os-/mil-/ship-) or an AOI marker to profile
+// its last-24h track (UTC-hour sparkline + routine + LLM narrative). Self-injects #pol-panel.
+const pol = new PolLayer(viewer)
 
 // -- HUD telemetry + voice + AI caption (M4/M5 keyless slices) ---------------
 initHud(viewer)
@@ -497,6 +566,9 @@ initVoice(
 new ScreenSpaceEventHandler(viewer.scene.canvas).setInputAction((click: { position: import('cesium').Cartesian2 }) => {
   const picked = viewer.scene.pick(click.position)
   const id: string | undefined = defined(picked) ? picked.id?.id : undefined
+  // pattern-of-life (additive): profile any tracked entity / AOI marker alongside its normal action
+  if (PolLayer.handles(id)) void pol.inspect(picked.id)
+  else pol.hide()
   if (id?.startsWith('sat-')) {
     const info = sats.showOrbit(id)
     if (info) status.textContent = info
@@ -510,6 +582,12 @@ new ScreenSpaceEventHandler(viewer.scene.canvas).setInputAction((click: { positi
   } else if (id?.startsWith('cctv-')) {
     // CCTV cam (CAP-20): fly to framing pose + open the live-snapshot PiP
     status.textContent = cctv.select(id)
+  } else if (id?.startsWith('tw-')) {
+    // tripwire AOI ring: recenter on that watch box
+    status.textContent = tripwires.inspect(id)
+  } else if (id?.startsWith('fx-')) {
+    // composite indicator: fly to it + LLM explains why the co-location matters
+    status.textContent = fusion.select(id)
   } else {
     sats.clearOrbit()
     viewer.trackedEntity = undefined

@@ -236,3 +236,63 @@ body.clean-ui #oil-panel { display: none; }
 #cctv-pip-pose span { color: #ffb74d; min-width: 26px; text-align: right; }
 #cctv-pip-note { margin-top: 4px; color: #546e7a; font-size: 8px; letter-spacing: 2px; }
 body.clean-ui #cctv-pip { display: none; }
+
+/* -- tripwires + sentinel (watchstander) — mirrors the └ SCAN rows + #dark-list -------- */
+#tw-arm, #tw-add {
+  font: inherit; font-size: 10px; letter-spacing: 1px; color: #78909c;
+  background: none; border: 1px solid #263238; border-radius: 3px;
+  padding: 2px 6px; margin: 2px 0 0 14px; cursor: pointer; display: block;
+}
+#tw-arm:hover, #tw-add:hover { color: #4fc3f7; border-color: #4fc3f7; }
+#tw-preset {
+  font: inherit; font-size: 10px; letter-spacing: 1px; color: #cfd8dc;
+  background: rgba(0, 0, 0, 0.4); border: 1px solid #263238; border-radius: 3px;
+  padding: 2px 4px; margin: 2px 0 0 14px; cursor: pointer; display: block; width: calc(100% - 14px);
+}
+#tw-preset option { background: #10181d; }
+#tripwire-list { margin: 3px 0 0 14px; color: #546e7a; font-size: 9px; letter-spacing: 1px; }
+#tripwire-list .tw-row { display: flex; justify-content: space-between; align-items: center; }
+#tripwire-list .tw-name {
+  flex: 1; text-align: left; font: inherit; font-size: 9px; letter-spacing: 0.5px;
+  color: #4fc3f7; background: none; border: none; padding: 2px 0; cursor: pointer;
+}
+#tripwire-list .tw-name:hover { color: #fff; }
+#tripwire-list .tw-del {
+  font: inherit; font-size: 9px; color: #ff8a80; background: none; border: none;
+  padding: 0 2px; cursor: pointer;
+}
+#tripwire-list .tw-del:hover { color: #ff5252; }
+
+/* -- cross-layer fusion: scan button + composite side list ---------------- */
+#fusion-scan {
+  font: inherit; font-size: 10px; letter-spacing: 1px; color: #78909c;
+  background: none; border: 1px solid #263238; border-radius: 3px;
+  padding: 2px 6px; margin: 2px 0 0 14px; cursor: pointer; display: block;
+}
+#fusion-scan:hover { color: #4fc3f7; border-color: #4fc3f7; }
+#fusion-scan:disabled { color: #455a64; cursor: default; }
+#fusion-list { margin: 3px 0 0 14px; color: #546e7a; font-size: 9px; letter-spacing: 1px; }
+#fusion-list .fusion-row {
+  display: block; width: 100%; text-align: left; font: inherit; font-size: 9px;
+  letter-spacing: 0.5px; color: #ffab40; background: none; border: none;
+  padding: 2px 0; cursor: pointer;
+}
+#fusion-list .fusion-row:hover { color: #fff; }
+
+/* -- pattern-of-life panel: UTC hour sparkline + routine readout ---- */
+#pol-panel {
+  position: absolute; top: 300px; right: 16px; width: 200px;
+  background: rgba(8, 14, 18, 0.82); border: 1px solid #263238;
+  border-radius: 6px; padding: 8px 10px; font-size: 10px; letter-spacing: 1px; color: #cfd8dc;
+}
+#pol-panel h3 { font-size: 10px; letter-spacing: 3px; color: #78909c; margin-bottom: 6px; }
+#pol-panel .pol-sub { font-size: 9px; color: #4fc3f7; letter-spacing: 1px; margin-bottom: 6px; word-break: break-all; }
+#pol-panel .pol-empty { color: #ff8a80; font-size: 9px; letter-spacing: 1px; padding: 6px 0; }
+#pol-panel .pol-spark { display: flex; align-items: flex-end; gap: 1px; height: 40px; margin-bottom: 2px; }
+#pol-panel .pol-bar { flex: 1; background: #37474f; min-height: 3px; }
+#pol-panel .pol-bar.on { background: #ffb74d; } /* active (above-baseline) hours in amber */
+#pol-panel .pol-axis { display: flex; justify-content: space-between; font-size: 8px; color: #455a64; margin-bottom: 6px; }
+#pol-panel .pol-row { display: flex; justify-content: space-between; padding: 2px 0; }
+#pol-panel .pol-row b { color: #ffb74d; }
+#pol-panel .pol-narr { border-top: 1px solid #263238; margin-top: 6px; padding-top: 6px; font-size: 9px; color: #9ccc65; letter-spacing: 1px; }
+body.clean-ui #pol-panel { display: none; }
