@@ -46,6 +46,8 @@ const ROUTES = [
   { prefix: '/feeds/mil2', target: 'https://opendata.adsb.fi', path: '/api/v2/mil', clean: true },
   { prefix: '/feeds/mil3', target: 'https://api.airplanes.live', path: '/v2/mil', clean: true },
   { prefix: '/feeds/oil', target: 'https://fred.stlouisfed.org', path: '/graph/fredgraph.csv', keepQuery: true },
+  { prefix: '/feeds/gdelt', target: 'https://api.gdeltproject.org', path: '/api/v1/gkg_geojson', clean: true },
+  { prefix: '/feeds/cables', target: 'https://www.submarinecablemap.com', path: '/api/v3/cable/cable-geo.json', clean: true },
   { prefix: '/feeds/llm', target: 'https://ollama.com', path: '/api/chat', auth: true },
 ]
 

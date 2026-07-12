@@ -28,6 +28,10 @@ export default defineConfig(({ mode }) => {
     '/feeds/mil': feed('https://api.adsb.lol', '/v2/mil'),
     '/feeds/mil2': feed('https://opendata.adsb.fi', '/api/v2/mil'),
     '/feeds/mil3': feed('https://api.airplanes.live', '/v2/mil'),
+    // GDELT v1 GKG GeoJSON (news hotspots) — no CORS header; v2 /api/v2/geo/geo is 404 upstream
+    '/feeds/gdelt': feed('https://api.gdeltproject.org', '/api/v1/gkg_geojson'),
+    // TeleGeography submarine-cable set — no CORS header
+    '/feeds/cables': feed('https://www.submarinecablemap.com', '/api/v3/cable/cable-geo.json'),
     // FRED oil-price CSV — no CORS header, proxy preserves the ?id= query (DS-17)
     '/feeds/oil': {
       target: 'https://fred.stlouisfed.org',

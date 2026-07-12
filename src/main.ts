@@ -35,6 +35,12 @@ import { TRIPWIRE_PRESETS } from './tripwire-core.mjs'
 import { FusionLayer } from './fusion'
 import { PolLayer } from './pol'
 import { initShare } from './share'
+import { init as initBoards } from './boards'
+import { initGibs } from './gibs'
+import { PassScheduler } from './passes'
+import { NewsLayer } from './news'
+import { setupKiosk } from './kiosk'
+import { GlobalInfraLayer, SubmarineCableLayer } from './global-infra'
 import { init as initBrief } from './brief'
 import { init as initAnalyst, type Candidate } from './analyst'
 import { normalizeOpenSky, normalizeAdsbMil } from './flights-normalize.mjs'
@@ -214,6 +220,26 @@ const infra = new InfraLayer(viewer, (n) => setInfraCount(n))
 setInfraCount = addLayerRow('CRITICAL INFRA', infra)
 setInfraCount(infra.count) // constructor already rendered; show its count now the row exists
 
+// -- global critical infra + submarine cables (worldwide, beyond the Gulf) ----
+let setGinfraCount: (n: number) => void = () => {}
+const ginfra = new GlobalInfraLayer(viewer, (n) => setGinfraCount(n))
+setGinfraCount = addLayerRow('GLOBAL INFRA', ginfra) // opt-in: constructor rendered but ds hidden
+setGinfraCount(ginfra.count)
+let setCableCount: (n: number) => void = () => {}
+const cables = new SubmarineCableLayer(viewer, (n) => setCableCount(n))
+setCableCount = addLayerRow('SUBMARINE CABLES', cables, { onDemand: true }) // ~1900 segments, filled by LOAD
+setCableCount(0)
+const cableBtn = document.createElement('button')
+cableBtn.id = 'cable-load'
+cableBtn.textContent = '└ LOAD CABLES'
+document.getElementById('layers')!.appendChild(cableBtn)
+cableBtn.onclick = async () => {
+  cableBtn.disabled = true
+  status.textContent = 'CABLES: LOADING TELEGEOGRAPHY SET…'
+  status.textContent = await cables.load()
+  cableBtn.disabled = false
+}
+
 // -- oil futures panel (DS-17): Brent/WTI sparklines from FRED, load-once ----
 void initOilPanel()
 
@@ -346,6 +372,9 @@ addLayerRow(
   { noCount: true }, // imagery overlay — no entity count
 )
 
+// -- recent satellite imagery (NASA GIBS): true color / fires / cloud + date --
+initGibs(viewer)
+
 // -- street traffic particles (CAP-16, on-demand per view) -------------------
 let setTrafficCount: (n: number) => void
 const traffic = new TrafficLayer(viewer, (n) => setTrafficCount(n))
@@ -389,6 +418,26 @@ jamAuto.onclick = () => {
   const on = !jamAuto.classList.contains('active')
   jamAuto.classList.toggle('active', on)
   status.textContent = gpsjam.setAuto(on)
+}
+
+// -- GDELT news hotspots (feeds -> narrative): last-15min geocoded mentions ---
+let setNewsCount: (n: number) => void = () => {}
+const news = new NewsLayer(viewer, (n) => setNewsCount(n))
+setNewsCount = addLayerRow('NEWS HOTSPOTS', news, { onDemand: true }) // filled by SCAN NEWS
+setNewsCount(0)
+const newsQuery = document.createElement('input')
+newsQuery.id = 'news-query'
+newsQuery.type = 'text'
+newsQuery.placeholder = 'war conflict strike…' // blank = module's default conflict query
+const newsBtn = document.createElement('button')
+newsBtn.id = 'news-scan'
+newsBtn.textContent = '└ SCAN NEWS'
+document.getElementById('layers')!.append(newsBtn, newsQuery)
+newsBtn.onclick = async () => {
+  newsBtn.disabled = true
+  status.textContent = 'NEWS: PULLING GDELT FEED…'
+  status.textContent = await news.scan(newsQuery.value)
+  newsBtn.disabled = false
 }
 
 // -- tripwires + sentinel (turn the viewer into a watchstander) --------------
@@ -444,6 +493,17 @@ maskInput.value = '20'
 maskLabel.append(' └ MASK ', maskInput, '°')
 document.getElementById('layers')!.appendChild(maskLabel)
 maskInput.oninput = () => aoiLines.setMask(Number(maskInput.value))
+
+// -- imaging-pass scheduler (CAP-12/29): next passes over the cached TLE set --
+// Rides the same localStorage TLE cache the SAT AOI LINES scan fills — no network.
+const passList = document.createElement('div')
+passList.id = 'pass-list'
+const passBtn = document.createElement('button')
+passBtn.id = 'pass-scan'
+passBtn.textContent = '└ NEXT PASSES'
+document.getElementById('layers')!.append(passBtn, passList)
+const passes = new PassScheduler(viewer, passList)
+passBtn.onclick = () => (status.textContent = passes.scan())
 
 // -- live CCTV mesh + ground projection (CAP-20, AC-04) ---------------------
 // Public DOT still-cams: marker per cam, click -> fly to a framing pose looking
@@ -508,13 +568,20 @@ const pol = new PolLayer(viewer)
 // Restore is camera + layer toggles (time/AOI restore is a documented ceiling). Only steady
 // non-scan layers are shareable — an on-demand layer's `shown` is empty until its scan runs.
 const SHAREABLE: Record<string, { shown: boolean }> = { flights, military, satellites: sats, earthquakes: quakes, ships, cctv, infra }
-initShare(viewer, {
+const shareOpts = {
   activeLayers: () => Object.keys(SHAREABLE).filter((k) => SHAREABLE[k].shown),
-  applyLayers: (names) => {
+  applyLayers: (names: string[]) => {
     const on = new Set(names)
     for (const [k, layer] of Object.entries(SHAREABLE)) layer.shown = on.has(k)
   },
-})
+}
+initShare(viewer, shareOpts)
+
+// -- saved boards: named camera+layer views, load / share-link / delete -------
+initBoards({ ...shareOpts, viewer })
+
+// -- ops-wall kiosk mode: fullscreen auto-cycle through the city tour (K) -----
+setupKiosk(viewer)
 
 // -- one-click SOURCED BRIEF: LLM (or template) situation report + credibility badges --------
 initBrief({
@@ -638,6 +705,9 @@ new ScreenSpaceEventHandler(viewer.scene.canvas).setInputAction((click: { positi
   } else if (id?.startsWith('fx-')) {
     // composite indicator: fly to it + LLM explains why the co-location matters
     status.textContent = fusion.select(id)
+  } else if (id?.startsWith('news-')) {
+    // news hotspot pin: fly to it + report name/mention count
+    status.textContent = news.select(id)
   } else {
     sats.clearOrbit()
     viewer.trackedEntity = undefined

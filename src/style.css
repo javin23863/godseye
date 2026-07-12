@@ -369,3 +369,43 @@ body.clean-ui #brief-btn, body.clean-ui #brief-panel { display: none; }
   background: rgba(0, 0, 0, 0.4); border: 1px solid #263238; border-radius: 3px; padding: 3px 4px;
 }
 body.clean-ui #analyst { display: none; }
+
+/* -- submarine cables + news + imaging passes: └ action rows ---------------- */
+#cable-load, #news-scan, #pass-scan {
+  font: inherit; font-size: 10px; letter-spacing: 1px; color: #78909c;
+  background: none; border: 1px solid #263238; border-radius: 3px;
+  padding: 2px 6px; margin: 2px 0 0 14px; cursor: pointer; display: block;
+}
+#cable-load:hover, #news-scan:hover, #pass-scan:hover { color: #4fc3f7; border-color: #4fc3f7; }
+#cable-load:disabled, #news-scan:disabled { color: #455a64; cursor: default; }
+#news-query {
+  display: block; width: calc(100% - 14px); margin: 2px 0 0 14px;
+  font: inherit; font-size: 10px; color: #4fc3f7; letter-spacing: 1px;
+  background: rgba(0, 0, 0, 0.4); border: 1px solid #263238; border-radius: 3px; padding: 2px 4px;
+}
+#news-query:focus { outline: none; border-color: #4fc3f7; }
+#pass-list { margin: 3px 0 0 14px; color: #546e7a; font-size: 9px; letter-spacing: 1px; }
+#pass-list .pass-row {
+  display: block; width: 100%; text-align: left; font: inherit; font-size: 9px;
+  letter-spacing: 0.5px; color: #9ccc65; background: none; border: none;
+  padding: 2px 0; cursor: pointer;
+}
+#pass-list .pass-row:hover { color: #fff; }
+
+/* -- ops-wall kiosk mode (K): fullscreen auto-cycle, globe + ticker only ----- */
+#kiosk-toggle {
+  position: absolute; bottom: 8px; right: 176px;
+  font: inherit; font-size: 10px; letter-spacing: 2px; color: #cfd8dc;
+  background: rgba(8, 14, 18, 0.82); border: 1px solid #263238;
+  border-radius: 6px; padding: 6px 12px; cursor: pointer;
+}
+#kiosk-toggle:hover { color: #4fc3f7; border-color: #4fc3f7; }
+#kiosk-ticker { display: none; }
+body.kiosk #kiosk-ticker {
+  display: block; position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+  font-size: 11px; letter-spacing: 3px; color: #4fc3f7;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.9); pointer-events: none; z-index: 7;
+}
+/* clean-ui hides the docks; kiosk also drops the brand, style badge + its own button */
+body.kiosk #brand, body.kiosk #active-style, body.kiosk #kiosk-toggle { display: none; }
+body.clean-ui #kiosk-toggle { display: none; }
