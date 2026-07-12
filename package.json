@@ -4,6 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "main": "electron/main.cjs",
+  "description": "God's Eye — geospatial OSINT globe (CesiumJS + live feeds, 4D playback, sensor shaders, voice + AI). Runs in the browser and as a desktop app.",
+  "author": "javin23863",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -15,29 +17,32 @@
   "build": {
     "appId": "com.javin23863.godseye",
     "productName": "GodsEye",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "electron/**",
-      "dist/**",
-      "package.json"
-    ],
-    "asar": false,
+    "directories": { "output": "release" },
+    "files": ["electron/**", "dist/**", "build/icon.ico", "package.json"],
+    "asar": true,
     "win": {
-      "target": [
-        "dir"
-      ]
+      "target": ["nsis", "portable"],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "God's Eye"
+    },
+    "portable": {
+      "artifactName": "GodsEye-${version}-portable.exe"
     }
   },
-  "dependencies": {
-    "cesium": "^1.126.0",
-    "satellite.js": "^5.0.0"
-  },
+  "dependencies": {},
   "devDependencies": {
+    "cesium": "^1.126.0",
     "electron": "^43.1.0",
     "electron-builder": "^26.15.3",
     "puppeteer-core": "^25.3.0",
+    "satellite.js": "^5.0.0",
     "typescript": "^5.6.0",
     "vite": "^6.0.0",
     "vite-plugin-cesium": "^1.2.23"
