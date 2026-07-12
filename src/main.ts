@@ -31,6 +31,7 @@ import { GpsJamLayer } from './gpsjam'
 import { AOILayer } from './aoi'
 import { CctvLayer } from './cctv'
 import { WindyCamLayer } from './windy'
+import { initWeather } from './weather'
 import { TripwireLayer } from './tripwires'
 import { TRIPWIRE_PRESETS } from './tripwire-core.mjs'
 import { FusionLayer } from './fusion'
@@ -551,6 +552,9 @@ webcamBtn.onclick = async () => {
   status.textContent = await webcams.scan()
   webcamBtn.disabled = false
 }
+
+// -- point weather (Windy GFS point-forecast): on-demand forecast at the view center ----
+initWeather(viewer, (t) => (status.textContent = t))
 
 // -- cross-layer fusion: co-located multi-INT composite indicators -----------
 // On-demand SCAN. Reads recorded military/quake/gpsjam frames + darkvessel loss points,

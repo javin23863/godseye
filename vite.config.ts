@@ -1,5 +1,51 @@
-import { defineConfig, loadEnv, type ProxyOptions } from 'vite'
+import https from 'node:https'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+import { defineConfig, loadEnv, type Plugin, type ProxyOptions } from 'vite'
 import cesium from 'vite-plugin-cesium'
+
+// Windy Point-Forecast auth is body-only (POST with `key` in the JSON, no header/query works),
+// so a plain proxy can't inject it. This middleware takes GET /feeds/weather?lat=&lon= and
+// synthesizes the full POST body server-side — the key never reaches the browser bundle.
+// Registered on both the dev and preview servers, only when the key is set.
+function windyWeather(key: string): Plugin {
+  const handler = (req: IncomingMessage, res: ServerResponse) => {
+    const u = new URL(req.url ?? '', 'http://x')
+    const lat = Number(u.searchParams.get('lat'))
+    const lon = Number(u.searchParams.get('lon'))
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      res.statusCode = 400
+      return res.end('bad coords')
+    }
+    const body = JSON.stringify({
+      lat, lon, model: 'gfs',
+      parameters: ['temp', 'wind', 'windGust', 'rh', 'pressure'], levels: ['surface'], key,
+    })
+    const preq = https.request(
+      { hostname: 'api.windy.com', path: '/api/point-forecast/v2', method: 'POST',
+        headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } },
+      (pres) => {
+        res.writeHead(pres.statusCode ?? 502, { 'content-type': 'application/json' })
+        pres.pipe(res)
+      },
+    )
+    preq.on('error', (e) => {
+      res.statusCode = 502
+      res.end(String(e))
+    })
+    preq.end(body)
+  }
+  return {
+    // block bodies: returning s.middlewares.use()'s value (the connect app) makes Vite
+    // treat it as a post-hook and invoke it with the wrong args -> crash on start.
+    name: 'windy-weather-proxy',
+    configureServer(s) {
+      s.middlewares.use('/feeds/weather', handler)
+    },
+    configurePreviewServer(s) {
+      s.middlewares.use('/feeds/weather', handler)
+    },
+  }
+}
 
 // OpenSky + the military-ADS-B mirrors don't serve CORS headers for third-party
 // origins, so the app calls same-origin /feeds/* and vite proxies (dev AND preview).
@@ -58,8 +104,10 @@ export default defineConfig(({ mode }) => {
       headers: { Authorization: `Bearer ${env.OLLAMA_API_KEY}` },
     }
   }
+  const plugins: Plugin[] = [cesium()]
+  if (env.WINDY_POINT_FORECAST_KEY) plugins.push(windyWeather(env.WINDY_POINT_FORECAST_KEY))
   return {
-    plugins: [cesium()],
+    plugins,
     server: { proxy },
     preview: { proxy },
   }

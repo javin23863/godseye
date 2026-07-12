@@ -73,6 +73,7 @@ function loadKey(name) {
 }
 let OLLAMA_API_KEY = null // resolved in createWindow (after app is ready, so getPath works)
 let WINDY_API_KEY = null
+let WINDY_PF_KEY = null // Windy Point-Forecast (weather) — separate product/key from webcams
 
 const MIME = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css',
@@ -117,6 +118,46 @@ function proxyFeed(route, req, res, u) {
   req.pipe(preq) // forwards the LLM POST body; a no-op for the GET feeds
 }
 
+// Windy Point-Forecast (weather): body-only auth, so the client sends GET /feeds/weather?lat=&lon=
+// and we synthesize the keyed POST body here — the key never reaches the renderer bundle.
+function proxyWeather(req, res, u) {
+  if (!WINDY_PF_KEY) {
+    res.writeHead(401, { 'content-type': 'application/json' })
+    return res.end('{"error":"no point-forecast key"}')
+  }
+  const lat = Number(u.searchParams.get('lat'))
+  const lon = Number(u.searchParams.get('lon'))
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    res.writeHead(400)
+    return res.end('bad coords')
+  }
+  const body = JSON.stringify({
+    lat, lon, model: 'gfs',
+    parameters: ['temp', 'wind', 'windGust', 'rh', 'pressure'], levels: ['surface'], key: WINDY_PF_KEY,
+  })
+  const preq = https.request(
+    { method: 'POST', hostname: 'api.windy.com', port: 443, path: '/api/point-forecast/v2',
+      headers: { host: 'api.windy.com', 'user-agent': UA, 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } },
+    (pres) => {
+      const clean = {}
+      for (const [k, v] of Object.entries(pres.headers)) if (!HOP_BY_HOP.has(k.toLowerCase())) clean[k] = v
+      res.writeHead(pres.statusCode || 502, clean)
+      pres.on('error', () => res.destroy())
+      pres.pipe(res)
+    },
+  )
+  preq.setTimeout(FEED_TIMEOUT_MS, () => preq.destroy(new Error('upstream timeout')))
+  preq.on('error', (e) => {
+    if (res.headersSent) res.destroy()
+    else {
+      res.writeHead(502)
+      res.end(`weather proxy error: ${e.message}`)
+    }
+  })
+  res.on('error', () => {})
+  preq.end(body)
+}
+
 function serveStatic(req, res, u) {
   let rel = decodeURIComponent(u.pathname)
   if (rel === '/' || rel === '') rel = '/index.html'
@@ -146,6 +187,7 @@ function startServer() {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
       const u = new URL(req.url, 'http://127.0.0.1')
+      if (u.pathname === '/feeds/weather') return proxyWeather(req, res, u) // POST-body key inject
       const route = ROUTES.find((r) => u.pathname === r.prefix) // exact match: /feeds/mil !== /feeds/mil2
       if (route) return proxyFeed(route, req, res, u)
       serveStatic(req, res, u)
@@ -245,6 +287,7 @@ function showError(w, msg) {
 async function createWindow() {
   OLLAMA_API_KEY = loadKey('OLLAMA_API_KEY')
   WINDY_API_KEY = loadKey('WINDY_API_KEY')
+  WINDY_PF_KEY = loadKey('WINDY_POINT_FORECAST_KEY')
   buildMenu()
 
   const saved = onScreen(loadState())
