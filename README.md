@@ -11,7 +11,7 @@ Working app, milestones M0–M5 plus the Hormuz analytics suite ([06-roadmap](do
 - **Globe** — CesiumJS; basemap switch GOOGLE 3D / AERIAL + LBL / ROAD. Runs keyless (Esri/OSM 2D fallback); with a Google Map Tiles key or Cesium ion token the photorealistic 3D tiles are the default.
 - **Live layers** — flights (OpenSky), military (airplanes.live + adsb.lol/adsb.fi mirrors), satellites (CelesTrak TLEs + SGP4, click = orbit track), earthquakes (USGS), boundaries, NEXRAD weather, **AIS ships** (aisstream WebSocket, moving/stationary split, click dossier), **street traffic** (Overpass roads + animated vehicles). 8000-entity cap per aircraft layer; per-layer SOLO isolation.
 - **Hormuz analytics** — **dark-vessel detection** (AIS-gap over recorded history), **chokepoint gate** crossing tally (preset or 2-click gate), **oil futures** panel (FRED Brent/WTI sparklines), **critical-infrastructure** layer (Gulf pipelines, chokepoints, refineries, desalination).
-- **GPS jamming** (CAP-21) — SCAN VIEW hex-bins low nav-integrity (NIC/NACp) ADS-B reports from airplanes.live into red degraded-GPS cells (the gpsjam.org method — zero new feeds).
+- **GPS jamming** (CAP-21) — SCAN VIEW hex-bins low nav-integrity (NIC/NACp) ADS-B reports from airplanes.live into red degraded-GPS cells (the gpsjam.org method — zero new feeds). Each scan records to the 4D archive and the playhead replays it, so jamming intensity evolves along the timeline; an opt-in AUTO-SCAN samples every 3 min to accumulate that evolution.
 - **Satellite AOI access lines** (CAP-12) — fan lines from imaging-satellite watchlist (Pleiades/WorldView/SkySat/Capella/ICEYE…) down to curated Iran/Hormuz AOIs whenever a bird is above the tunable elevation mask.
 - **CCTV mesh + ground projection** (CAP-20) — public DOT still-cams; click a camera → fly to a framing pose + live-snapshot picture-in-picture (1 frame/min); COVERAGE footprint wedge, ALIGN-DRAPE outline/fill, manual pose sliders (auto-cal is WIP, matching the original).
 - **Style** — CRT / NVG / FLIR / ANIME / NOIR presets (keys 1–6), bloom/sharpen/pixelate, clean-UI (H).
@@ -21,7 +21,7 @@ Working app, milestones M0–M5 plus the Hormuz analytics suite ([06-roadmap](do
 
 Keys (all free-tier, in gitignored `.env` — copy `.env.example`): `VITE_GOOGLE_TILES_KEY` (3D tiles), `VITE_AISSTREAM_KEY` (ships), `OLLAMA_API_KEY` (AI caption/Q&A, injected server-side by the proxy). None required — the app degrades gracefully without each.
 
-Remaining backlog: worker-thread parsing/clustering (a performance hardening — deferred until the entity load actually janks), true projective-texture CCTV drape onto the 3D tileset, and temporal GPS-jam evolution across the 4D timeline. See [07-session-notes](docs/07-session-notes.md).
+Remaining backlog: worker-thread parsing/clustering (a performance hardening — deferred until the entity load actually janks), true projective-texture CCTV drape onto the 3D tileset (public cams serve no CORS-enabled image to sample), and CCTV PnP auto-calibration (author-marked WIP). See [07-session-notes](docs/07-session-notes.md).
 
 ```sh
 npm install

@@ -191,6 +191,13 @@ body.clean-ui #oil-panel { display: none; }
 }
 #jam-scan:hover { color: #4fc3f7; border-color: #4fc3f7; }
 #jam-scan:disabled { color: #455a64; cursor: default; }
+#jam-auto {
+  font: inherit; font-size: 10px; letter-spacing: 1px; color: #78909c;
+  background: none; border: 1px solid #263238; border-radius: 3px;
+  padding: 2px 6px; margin: 2px 0 0 14px; cursor: pointer; display: block;
+}
+#jam-auto:hover { color: #4fc3f7; border-color: #4fc3f7; }
+#jam-auto.active { color: #ff5252; border-color: #ff5252; } /* live sampling = red, matches jam cells */
 
 /* -- CCTV mesh: scan-style buttons + snapshot PiP (CAP-20) ---------------- */
 #cctv-coverage, #cctv-drape {

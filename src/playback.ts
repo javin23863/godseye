@@ -1,6 +1,7 @@
 // Timeline playback (M3, CAP: 4D replay): scrub recorded snapshots; satellites
 // re-propagate from TLEs at the playback instant (no recording needed for orbits).
 import type { Aircraft, AircraftLayer } from './aircraft'
+import type { GpsJamLayer } from './gpsjam'
 import type { Quake, QuakeLayer } from './quakes'
 import type { SatelliteLayer } from './satellites'
 import type { Ship, ShipLayer } from './ships'
@@ -20,6 +21,7 @@ export function initPlayback(opts: {
   quakes: QuakeLayer
   sats: SatelliteLayer
   ships?: ShipLayer
+  gpsjam: GpsJamLayer
   onStatus: (text: string) => void
 }) {
   const bar = document.getElementById('timeline')!
@@ -47,6 +49,7 @@ export function initPlayback(opts: {
     flights: opts.flights,
     military: opts.military,
     earthquakes: opts.quakes,
+    gpsjam: opts.gpsjam,
     ...(opts.ships?.enabled ? { ships: opts.ships } : {}),
   }
 
@@ -63,6 +66,8 @@ export function initPlayback(opts: {
       if (q) opts.quakes.renderItems(q.items as Quake[])
       const sh = snaps.get('ships')
       if (sh && opts.ships) opts.ships.renderItems(sh.items as Ship[])
+      const j = snaps.get('gpsjam')
+      if (j) opts.gpsjam.renderItems(j.items as never[])
       opts.sats.playbackTime = new Date(at)
       opts.sats.repropagate()
       readout.textContent = new Date(at).toISOString().replace('T', ' ').slice(0, 19) + 'Z'

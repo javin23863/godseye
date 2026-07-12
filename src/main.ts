@@ -210,9 +210,6 @@ setInfraCount(infra.count) // constructor already rendered; show its count now t
 // -- oil futures panel (DS-17): Brent/WTI sparklines from FRED, load-once ----
 void initOilPanel()
 
-// -- 4D playback (M3): record-first, scrub recorded snapshots ---------------
-initPlayback({ flights, military, quakes, sats, ships, onStatus: (t) => (status.textContent = t) })
-
 // -- style presets + effect controls (CAP-04 / CAP-05 / CAP-06) ------------
 const fx = new StyleFx(viewer)
 const styleName = document.getElementById('style-name')!
@@ -375,6 +372,21 @@ jamBtn.onclick = async () => {
   status.textContent = await gpsjam.scan()
   jamBtn.disabled = false
 }
+// AUTO-SCAN (CAP-21 temporal): opt-in periodic re-scan so the 4D timeline accumulates
+// jam-cell evolution. Off by default — each tick spends one airplanes.live point query.
+const jamAuto = document.createElement('button')
+jamAuto.id = 'jam-auto'
+jamAuto.textContent = '└ AUTO-SCAN'
+document.getElementById('layers')!.appendChild(jamAuto)
+jamAuto.onclick = () => {
+  const on = !jamAuto.classList.contains('active')
+  jamAuto.classList.toggle('active', on)
+  status.textContent = gpsjam.setAuto(on)
+}
+
+// -- 4D playback (M3): record-first, scrub recorded snapshots (incl. GPS-jam evolution) ----
+// After all recording layers (incl. gpsjam) exist, so the playhead can replay every one.
+initPlayback({ flights, military, quakes, sats, ships, gpsjam, onStatus: (t) => (status.textContent = t) })
 
 // -- satellite-to-ground AOI access lines (CAP-12, AC-05; imaging watchlist CAP-29) --
 // Line drawn sat->AOI whenever an imaging bird is above the elevation mask over a target.

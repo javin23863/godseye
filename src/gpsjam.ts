@@ -4,16 +4,19 @@
 // On-demand SCAN VIEW, single-shot per activation (Overpass/traffic-style budget).
 // ponytail: lat/lon square grid, not H3 hexagons — swap binIntegrity's cell math
 // if hex tiling is ever required.
-// ponytail: one-shot scan, no temporal evolution across 4D playback (CAP-21 wants
-// intensity that evolves with the timeline) — wire into recorder + playhead render
-// when the playback pass reaches this layer, same pattern as ships/darkvessel.
+// Temporal (CAP-21): each scan records its cells (record-first, STK-10) and the 4D
+// playhead replays them via renderItems — same pattern as ships/darkvessel. AUTO-SCAN
+// opts into periodic sampling so the archive accumulates evolution (off by default,
+// since every scan spends one airplanes.live point query = budget-safe).
 import { Color, CustomDataSource, Math as CMath, Rectangle, Viewer } from 'cesium'
 import { binIntegrity } from './gpsjam-bin.mjs'
+import { record } from './recorder'
 
 const POINT_URL = 'https://api.airplanes.live/v2/point'
 const DEFAULT_CENTER = { lat: 26.5, lon: 56.3 } // Strait of Hormuz — app default theater
 const DEFAULT_RADIUS_NM = 250
 const CELL_DEG = 0.25
+const AUTO_MS = 180_000 // auto-scan cadence (3 min) — one point query per tick, so opt-in only
 
 interface Report {
   lat: number
@@ -22,10 +25,14 @@ interface Report {
   nac_p?: number
 }
 
+type Cell = ReturnType<typeof binIntegrity>[number]
+
 export class GpsJamLayer {
   readonly ds = new CustomDataSource('gpsjam')
   count = 0
   busy = false
+  playback = false // playhead owns the draw while replaying; live scans record but don't paint
+  private autoTimer: number | null = null
 
   constructor(private viewer: Viewer, private onUpdate: (count: number) => void) {
     viewer.dataSources.add(this.ds)
@@ -48,7 +55,8 @@ export class GpsJamLayer {
       const body = (await res.json()) as { ac?: Report[] }
       const reports = body.ac ?? []
       const cells = binIntegrity(reports, CELL_DEG)
-      this.render(cells)
+      void record('gpsjam', cells) // record-first (STK-10): the 4D timeline replays jam evolution
+      if (!this.playback) this.draw(cells) // during playback the playhead owns the draw
       const low = cells.reduce((a, c) => a + c.low, 0)
       return cells.length
         ? `GPS JAM: ${cells.length} CELLS FROM ${reports.length} AIRCRAFT (${low} LOW-INTEGRITY)`
@@ -75,7 +83,26 @@ export class GpsJamLayer {
     return { ...DEFAULT_CENTER, radiusNm: DEFAULT_RADIUS_NM }
   }
 
-  private render(cells: ReturnType<typeof binIntegrity>) {
+  /** Playback: redraw recorded jam cells at the playhead instant (same seam as ships/darkvessel). */
+  renderItems(cells: Cell[]) {
+    this.draw(cells)
+  }
+
+  /** Opt-in periodic re-scan so the 4D archive accumulates jam evolution. Off by default —
+   *  each tick spends one airplanes.live point query, so this is never a silent background poll. */
+  setAuto(on: boolean): string {
+    if (this.autoTimer) {
+      window.clearInterval(this.autoTimer)
+      this.autoTimer = null
+    }
+    if (on)
+      this.autoTimer = window.setInterval(() => {
+        if (this.shown && !this.busy) void this.scan()
+      }, AUTO_MS)
+    return `GPS JAM: AUTO-SCAN ${on ? `ON (EVERY ${AUTO_MS / 60_000}M)` : 'OFF'}`
+  }
+
+  private draw(cells: Cell[]) {
     this.ds.entities.suspendEvents()
     this.ds.entities.removeAll()
     cells.forEach((c, i) => {
@@ -89,8 +116,16 @@ export class GpsJamLayer {
         description: `GPS jamming cell<br>${c.low}/${c.total} low-integrity (${Math.round(c.frac * 100)}%)`,
       })
     })
+    this.ds.entities.resumeEvents()
     this.count = cells.length
     this.onUpdate(this.count)
+  }
+
+  /** Playback exit calls refresh() to snap every layer back to live. GPS-jam is on-demand
+   *  (no live poll to restore), so "live" = blank — clear the stranded historical frame the
+   *  playhead left painted, rather than pass an old scan off as current. */
+  refresh() {
+    this.clear()
   }
 
   clear() {

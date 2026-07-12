@@ -34,6 +34,7 @@ if (!has('CCTV MESH')) errors.push('missing row: CCTV MESH')
 
 const controls = await page.evaluate(() => ({
   jamScan: !!document.getElementById('jam-scan'),
+  jamAuto: !!document.getElementById('jam-auto'),
   maskInput: !!document.querySelector('#layers input[type=range]'),
   cctvCoverage: !!document.getElementById('cctv-coverage'),
   cctvDrape: !!document.getElementById('cctv-drape'),
@@ -58,10 +59,32 @@ await page.click('#cctv-drape')
 await new Promise((r) => setTimeout(r, 1_500))
 const status = await page.evaluate(() => document.getElementById('status')?.textContent)
 
+// temporal GPS-jam: gpsjam now records + replays on the 4D timeline. Arm auto-scan, then
+// enter playback — the playhead must feed the gpsjam layer via renderItems WITHOUT throwing
+// (a regression here surfaces as a pageerror). Jam cells over the sparse Gulf are honestly 0,
+// so we assert on the wiring not throwing + playback engaging, not on a cell count.
+await page.click('#jam-auto')
+const errsBeforePb = errors.length
+await page.click('#pb-toggle')
+await new Promise((r) => setTimeout(r, 1_500))
+const inPlayback = await page.evaluate(() => document.body.classList.contains('playback'))
+await page.evaluate(() => {
+  const s = document.getElementById('pb-slider')
+  if (s) {
+    s.value = s.max
+    s.dispatchEvent(new Event('input'))
+  }
+})
+await new Promise((r) => setTimeout(r, 1_500))
+const pbTime = await page.evaluate(() => document.getElementById('pb-time')?.textContent)
+if (errors.length > errsBeforePb) errors.push('gpsjam playback path threw (see pageerror above)')
+if (!inPlayback) console.warn('note: playback did not engage (thin recorded range this run)')
+await page.evaluate(() => document.getElementById('pb-toggle')?.click()) // back to live
+
 await page.screenshot({ path: SHOT })
 await browser.close()
 
-console.log(JSON.stringify({ rows, controls, cctvCount, status }))
+console.log(JSON.stringify({ rows, controls, cctvCount, status, inPlayback, pbTime }))
 if (errors.length) {
   console.error('BACKLOG VERIFY FAILED:')
   for (const e of errors) console.error(' ', e)

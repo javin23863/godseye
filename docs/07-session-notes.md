@@ -201,7 +201,7 @@ The spec above was handed off, then the same operator said **"begin"** — so th
 - **Keyed features** (`fff927c`, keys in gitignored `.env`) — Google 3D tiles as default basemap; **AIS ships** (aisstream WebSocket, moving/stationary split, click dossier); **LLM** caption + voice Q&A (Ollama `minimax-m3:cloud`, key injected server-side by the `/feeds/llm` proxy, never in the bundle).
 - **Hormuz analytics suite** (`b94e080`) via a tiered opus/sonnet/haiku subagent workflow — dark-vessel detection (AIS gap over recorded history), chokepoint gate crossing tally, oil futures panel (FRED Brent/WTI), critical-infrastructure layer.
 - **Backlog-3** (`95961ed`) via a second tiered workflow (opus CCTV, sonnet GPS-jam + AOI, opus adversarial review per module) —
-  - **GPS jamming** (CAP-21): SCAN VIEW hex-bins low nav-integrity (NIC/NACp) ADS-B reports from `airplanes.live/v2/point` into red degraded-GPS cells — the gpsjam.org method, zero new feeds.
+  - **GPS jamming** (CAP-21): SCAN VIEW hex-bins low nav-integrity (NIC/NACp) ADS-B reports from `airplanes.live/v2/point` into red degraded-GPS cells — the gpsjam.org method, zero new feeds. **Temporal follow-up** (below): each scan now records its cells and the 4D playhead replays them, so jamming intensity evolves along the timeline.
   - **Satellite AOI access lines** (CAP-12): imaging-satellite watchlist (Pleiades/WorldView/SkySat/Capella/ICEYE…) → fan lines to curated Iran/Hormuz AOIs whenever a bird is above a tunable elevation mask; reuses the CelesTrak TLE cache.
   - **CCTV mesh** (CAP-20): public DOT still-cams, click → fly-to framing pose + live-snapshot picture-in-picture (1 frame/min), COVERAGE footprint wedge, ALIGN-DRAPE outline/fill, manual pose sliders.
 
@@ -223,8 +223,18 @@ The spec above was handed off, then the same operator said **"begin"** — so th
 ## Remaining (not built — needs an operator call)
 
 - **Worker-thread parsing/clustering** (improvement B-10) — deliberately **deferred**: the 8000-entity cap holds and nothing janks yet, so building a worker pipeline now would be speculative.
-- **True projective-texture CCTV drape** onto the 3D tileset (the "draped onto real buildings" headline) — needs a classification primitive / custom tileset shader; the wedge-drape + PiP is the honest stand-in.
-- **Temporal GPS-jam evolution** across the 4D timeline (CAP-21 wants intensity that evolves with the playhead) — the current layer is a live single-scan.
+- **True projective-texture CCTV drape** onto the 3D tileset (the "draped onto real buildings" headline) — needs a classification primitive / custom tileset shader, and the public cams serve no CORS-enabled image to sample; the wedge-drape + PiP is the honest stand-in. Genuine ceiling.
 - **CCTV PnP auto-calibration** (B-18) — the author himself marked this WIP; manual pose sliders are the shipped state.
+
+## Temporal GPS-jam follow-up (built after the remaining-list above)
+
+CAP-21 wanted jamming intensity that **evolves with the playhead**, not a one-shot scan — so this shipped next:
+
+- **Record-first** (STK-10): `GpsJamLayer.scan()` now `record('gpsjam', cells)`s each scan's degraded-GPS cells to the IndexedDB recorder, then draws only when not in playback (`this.playback` guard) so a live tick never paints over the playhead frame.
+- **Replay**: `renderItems(cells)` lets the 4D playhead redraw recorded cells at the scrubbed instant — `gpsjam` is now a `initPlayback` layer, same seam as ships/dark-vessel. On playback exit `refresh()` clears the layer (on-demand, no live poll to restore → "live" = blank, never a stale historical frame passed off as current).
+- **AUTO-SCAN** toggle (`#jam-auto`, off by default): opt-in re-scan every 3 min (`AUTO_MS=180000`) so the archive actually accumulates evolution — off by default because each tick spends one `airplanes.live` point query. Manual scans alone give sparse frames; Gulf cells are often honestly 0.
+- **Verified**: `tsc` + `vite build` clean, 41/41 unit tests, `verify-backlog` extended to drive the gpsjam playback path (auto-scan → enter playback → scrub → exit) with zero pageerrors. A 4-lens opus adversarial review (correctness / types-API / integration / budget-honesty) returned **SHIP**; its one confirmed wart (stranded frame on playback exit) is the `refresh()`-clears fix above.
+
+Still open after this: worker-thread parsing (B-10, deferred) + the two CCTV ceilings above — the "Remaining (not built)" list, minus temporal GPS-jam.
 
 *End of build-phase log.*
