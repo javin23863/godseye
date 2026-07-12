@@ -3,7 +3,7 @@
 // and fly the camera back on restore. Codec is in scene-state.mjs (headless, node --test'able);
 // this file is only the cesium/DOM seam.
 import { Cartesian3, Math as CMath, Viewer } from 'cesium'
-import { decodeState, encodeState } from './scene-state.mjs'
+import { decodeState, encodeState } from './scene-state-codec.mjs'
 
 export interface Aoi {
   lat: number

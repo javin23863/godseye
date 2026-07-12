@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { encodeState, decodeState } from '../src/scene-state.mjs'
+import { encodeState, decodeState } from '../src/scene-state-codec.mjs'
 
 test('full state round-trips losslessly', () => {
   const state = {

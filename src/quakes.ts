@@ -22,6 +22,7 @@ export class QuakeLayer {
   count = 0
   playback = false
   private timer: number | undefined
+  private last: Quake[] = []
 
   constructor(private viewer: Viewer, private onUpdate: (count: number) => void) {
     viewer.dataSources.add(this.ds)
@@ -32,6 +33,14 @@ export class QuakeLayer {
   }
   set shown(v: boolean) {
     this.ds.show = v
+  }
+
+  /** Last rendered quakes — for fusion/analyst candidates + the brief's top-N. */
+  get items(): Quake[] {
+    return this.last
+  }
+  topByMag(n: number): Quake[] {
+    return [...this.last].sort((a, b) => b.mag - a.mag).slice(0, n)
   }
 
   start() {
@@ -67,6 +76,7 @@ export class QuakeLayer {
       })
     }
     this.count = quakes.length
+    this.last = quakes
     this.onUpdate(this.count)
   }
 }

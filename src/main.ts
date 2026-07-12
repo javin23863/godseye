@@ -34,6 +34,9 @@ import { TripwireLayer } from './tripwires'
 import { TRIPWIRE_PRESETS } from './tripwire-core.mjs'
 import { FusionLayer } from './fusion'
 import { PolLayer } from './pol'
+import { initShare } from './share'
+import { init as initBrief } from './brief'
+import { init as initAnalyst, type Candidate } from './analyst'
 import { normalizeOpenSky, normalizeAdsbMil } from './flights-normalize.mjs'
 import './style.css'
 
@@ -500,6 +503,53 @@ fusionScan.onclick = async () => {
 // -- pattern-of-life: click a tracked entity (os-/mil-/ship-) or an AOI marker to profile
 // its last-24h track (UTC-hour sparkline + routine + LLM narrative). Self-injects #pol-panel.
 const pol = new PolLayer(viewer)
+
+// -- shareable moments: deep-link restore + SHARE link + REC CLIP (growth loop) ------
+// Restore is camera + layer toggles (time/AOI restore is a documented ceiling). Only steady
+// non-scan layers are shareable — an on-demand layer's `shown` is empty until its scan runs.
+const SHAREABLE: Record<string, { shown: boolean }> = { flights, military, satellites: sats, earthquakes: quakes, ships, cctv, infra }
+initShare(viewer, {
+  activeLayers: () => Object.keys(SHAREABLE).filter((k) => SHAREABLE[k].shown),
+  applyLayers: (names) => {
+    const on = new Set(names)
+    for (const [k, layer] of Object.entries(SHAREABLE)) layer.shown = on.has(k)
+  },
+})
+
+// -- one-click SOURCED BRIEF: LLM (or template) situation report + credibility badges --------
+initBrief({
+  picture() {
+    const on = (key: string, label: string, l: { shown: boolean; count: number }) =>
+      l.shown && l.count > 0 ? [{ key, label, count: l.count }] : []
+    const activeLayers = [
+      ...on('flights', 'FLIGHTS', flights),
+      ...on('military', 'MILITARY', military),
+      ...on('satellites', 'SATELLITES', sats),
+      ...on('earthquakes', 'EARTHQUAKES 24H', quakes),
+      ...(ships.enabled && ships.shown && ships.count > 0 ? [{ key: 'ships', label: 'SHIPS', count: ships.count }] : []),
+      ...on('gpsjam', 'GPS JAMMING', gpsjam),
+      ...on('darkvessel', 'DARK VESSELS', darkvessel),
+    ]
+    const events: { kind: string; text: string }[] = []
+    if (darkvessel.count > 0) events.push({ kind: 'dark-vessel', text: `${darkvessel.count} vessels currently dark` })
+    if (fusion.count > 0) events.push({ kind: 'fusion', text: `${fusion.count} multi-INT composite(s)` })
+    if (tripwires.count > 0) events.push({ kind: 'tripwire', text: `${tripwires.count} tripwire(s) armed` })
+    for (const q of quakes.topByMag(3)) events.push({ kind: 'quake', text: `M${q.mag} · ${q.place}` })
+    return { activeLayers, events, windowLabel: 'LAST 6H' }
+  },
+})
+
+// -- AI-as-analyst: "what needs attention" (top-3 fly-to chips) + natural-language geo-query --
+function analystCandidates(): Candidate[] {
+  const out: Candidate[] = []
+  for (const e of darkvessel.events)
+    out.push({ kind: 'dark vessel', lat: e.lastSeen.lat, lon: e.lastSeen.lon, score: e.gapMin, text: `${e.name} DARK ${e.gapMin}M` })
+  for (const c of fusion.composites)
+    out.push({ kind: 'fusion', lat: c.lat, lon: c.lon, score: c.score * 3, text: c.layers.join('+').toUpperCase() })
+  for (const q of quakes.items) if (q.mag >= 4) out.push({ kind: 'quake', lat: q.lat, lon: q.lon, score: q.mag, text: `M${q.mag} ${q.place}` })
+  return out
+}
+initAnalyst({ candidates: analystCandidates, viewer })
 
 // -- HUD telemetry + voice + AI caption (M4/M5 keyless slices) ---------------
 initHud(viewer)

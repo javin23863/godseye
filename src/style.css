@@ -296,3 +296,76 @@ body.clean-ui #cctv-pip { display: none; }
 #pol-panel .pol-row b { color: #ffb74d; }
 #pol-panel .pol-narr { border-top: 1px solid #263238; margin-top: 6px; padding-top: 6px; font-size: 9px; color: #9ccc65; letter-spacing: 1px; }
 body.clean-ui #pol-panel { display: none; }
+
+/* -- shareable moments: SHARE + REC CLIP bar (top-center HUD) ------- */
+#share-bar {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; z-index: 6;
+}
+#share-bar button {
+  font: inherit; font-size: 10px; letter-spacing: 2px; color: #cfd8dc;
+  background: rgba(8, 14, 18, 0.82); border: 1px solid #263238;
+  border-radius: 6px; padding: 6px 12px; cursor: pointer;
+}
+#share-bar button:hover { color: #4fc3f7; border-color: #4fc3f7; }
+#share-bar #rec-clip.active { color: #ff5252; border-color: #ff5252; } /* live recording = red */
+#share-bar button:disabled { color: #455a64; cursor: default; }
+body.clean-ui #share-bar { display: none; }
+
+/* -- one-click SOURCED BRIEF: floating button + panel --- */
+#brief-btn {
+  position: absolute; bottom: 8px; right: 92px;
+  font: inherit; font-size: 10px; letter-spacing: 2px; color: #ffab40;
+  background: rgba(8, 14, 18, 0.82); border: 1px solid #263238;
+  border-radius: 6px; padding: 6px 12px; cursor: pointer;
+}
+#brief-btn:hover { color: #fff; border-color: #ffab40; }
+#brief-btn:disabled { color: #455a64; cursor: default; }
+#brief-panel {
+  position: absolute; bottom: 44px; right: 16px; width: 268px; max-height: 62vh; overflow-y: auto;
+  background: rgba(8, 14, 18, 0.9); border: 1px solid #263238;
+  border-radius: 6px; padding: 8px 10px; font-size: 10px; letter-spacing: 1px; color: #cfd8dc;
+}
+#brief-panel h3 { font-size: 10px; letter-spacing: 3px; color: #78909c; margin-bottom: 6px; }
+#brief-panel .brief-narr { font-size: 10px; line-height: 1.45; color: #9ccc65; margin-bottom: 8px; }
+#brief-panel .brief-src-h { font-size: 8px; letter-spacing: 2px; color: #546e7a; border-top: 1px solid #263238; padding-top: 6px; margin-bottom: 4px; }
+#brief-panel .brief-badge { padding: 4px 0; border-bottom: 1px solid #1a2327; }
+#brief-panel .brief-badge-l { font-size: 9px; letter-spacing: 1px; color: #4fc3f7; }
+#brief-panel .brief-badge-m { font-size: 9px; color: #b0bec5; }
+#brief-panel .brief-badge-lim { font-size: 8px; color: #607d8b; line-height: 1.3; }
+#brief-panel .brief-empty { color: #ff8a80; font-size: 9px; padding: 4px 0; }
+#brief-panel .brief-copy {
+  margin-top: 8px; font: inherit; font-size: 9px; letter-spacing: 2px; color: #ffab40;
+  background: transparent; border: 1px solid #37474f; border-radius: 4px; padding: 4px 10px; cursor: pointer;
+}
+#brief-panel .brief-copy:hover { color: #fff; border-color: #ffab40; }
+#brief-panel .brief-copy:disabled { color: #455a64; cursor: default; }
+body.clean-ui #brief-btn, body.clean-ui #brief-panel { display: none; }
+
+/* -- AI analyst: attention ranking + NL query (copilot) -------- */
+#analyst {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 300px;
+  background: rgba(8, 14, 18, 0.82); border: 1px solid #263238; border-radius: 6px;
+  padding: 8px 10px; font-size: 10px; letter-spacing: 1px; color: #cfd8dc; z-index: 5; margin-top: 40px;
+}
+#analyst h3 { font-size: 10px; letter-spacing: 3px; color: #78909c; margin-bottom: 6px; }
+#analyst #attention-run {
+  font: inherit; font-size: 10px; letter-spacing: 2px; color: #ffab40;
+  background: none; border: 1px solid #263238; border-radius: 3px;
+  padding: 3px 8px; cursor: pointer; width: 100%; text-align: left;
+}
+#analyst #attention-run:hover { color: #fff; border-color: #ffab40; }
+#analyst #attention { color: #546e7a; font-size: 9px; }
+#analyst .attention-chip {
+  display: block; width: 100%; text-align: left; font: inherit; font-size: 9px;
+  letter-spacing: 0.5px; color: #cfd8dc; background: none;
+  border: 1px solid #263238; border-radius: 3px; padding: 3px 6px; margin-top: 4px; cursor: pointer;
+}
+#analyst .attention-chip:hover { border-color: #4fc3f7; color: #fff; }
+#analyst .attention-chip b { color: #4fc3f7; }
+#analyst .attention-chip small { display: block; color: #9ccc65; font-size: 8px; margin-top: 2px; }
+#analyst #nlq {
+  width: 100%; font: inherit; font-size: 10px; color: #cfd8dc; margin-top: 6px;
+  background: rgba(0, 0, 0, 0.4); border: 1px solid #263238; border-radius: 3px; padding: 3px 4px;
+}
+body.clean-ui #analyst { display: none; }

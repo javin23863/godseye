@@ -65,6 +65,11 @@ export class FusionLayer {
     this.ds.show = v
   }
 
+  /** Composites from the last scan — for the analyst's attention candidates. */
+  get composites(): Composite[] {
+    return [...this.byId.values()]
+  }
+
   /** Gather the picture, correlate, render, return a status line. */
   async scan(): Promise<string> {
     const events = await this.gather()
