@@ -409,3 +409,25 @@ body.kiosk #kiosk-ticker {
 /* clean-ui hides the docks; kiosk also drops the brand, style badge + its own button */
 body.kiosk #brand, body.kiosk #active-style, body.kiosk #kiosk-toggle { display: none; }
 body.clean-ui #kiosk-toggle { display: none; }
+
+/* -- Windy public webcams: SCAN VIEW row + preview PiP ---------------------- */
+#webcam-scan {
+  font: inherit; font-size: 10px; letter-spacing: 1px; color: #78909c;
+  background: none; border: 1px solid #263238; border-radius: 3px;
+  padding: 2px 6px; margin: 2px 0 0 14px; cursor: pointer; display: block;
+}
+#webcam-scan:hover { color: #4fc3f7; border-color: #4fc3f7; }
+#webcam-scan:disabled { color: #455a64; cursor: default; }
+#windy-pip {
+  display: none; position: absolute; bottom: 74px; left: 16px; width: 320px;
+  background: rgba(8, 14, 18, 0.92); border: 1px solid #263238; border-radius: 6px;
+  padding: 6px; z-index: 6; font-size: 10px; letter-spacing: 1px;
+}
+#windy-pip-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; color: #4fc3f7; }
+#windy-pip-close { background: none; border: none; color: #78909c; font-size: 14px; cursor: pointer; line-height: 1; }
+#windy-pip-close:hover { color: #fff; }
+#windy-pip-img { display: block; width: 100%; border: 1px solid #263238; border-radius: 3px; }
+#windy-pip-fallback { display: none; color: #ff8a80; font-size: 9px; padding: 20px 0; text-align: center; }
+#windy-pip-link { display: block; margin-top: 4px; color: #ffab40; font-size: 9px; letter-spacing: 2px; text-decoration: none; }
+#windy-pip-link:hover { color: #fff; }
+body.clean-ui #windy-pip { display: none !important; }

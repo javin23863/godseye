@@ -30,6 +30,7 @@ import { initOilPanel } from './oil'
 import { GpsJamLayer } from './gpsjam'
 import { AOILayer } from './aoi'
 import { CctvLayer } from './cctv'
+import { WindyCamLayer } from './windy'
 import { TripwireLayer } from './tripwires'
 import { TRIPWIRE_PRESETS } from './tripwire-core.mjs'
 import { FusionLayer } from './fusion'
@@ -533,6 +534,24 @@ cctvDrape.onclick = () => {
   status.textContent = cctv.setDrape(on)
 }
 
+// -- global public webcams (Windy): CCTV coverage worldwide, on-demand per view ----
+// Public opt-in cams near the view center via the key-injected /feeds/windy proxy.
+// Degrades honestly to "NO WINDY KEY" when WINDY_API_KEY isn't set in .env.
+let setWebcamCount: (n: number) => void = () => {}
+const webcams = new WindyCamLayer(viewer, (n) => setWebcamCount(n))
+setWebcamCount = addLayerRow('PUBLIC WEBCAMS', webcams, { onDemand: true }) // filled by SCAN VIEW
+setWebcamCount(0)
+const webcamBtn = document.createElement('button')
+webcamBtn.id = 'webcam-scan'
+webcamBtn.textContent = '└ SCAN VIEW'
+document.getElementById('layers')!.appendChild(webcamBtn)
+webcamBtn.onclick = async () => {
+  webcamBtn.disabled = true
+  status.textContent = 'WEBCAMS: QUERYING WINDY NEAR VIEW…'
+  status.textContent = await webcams.scan()
+  webcamBtn.disabled = false
+}
+
 // -- cross-layer fusion: co-located multi-INT composite indicators -----------
 // On-demand SCAN. Reads recorded military/quake/gpsjam frames + darkvessel loss points,
 // clusters co-located events spanning >=2 layers, scores them, click = fly-to + LLM "why".
@@ -708,6 +727,9 @@ new ScreenSpaceEventHandler(viewer.scene.canvas).setInputAction((click: { positi
   } else if (id?.startsWith('news-')) {
     // news hotspot pin: fly to it + report name/mention count
     status.textContent = news.select(id)
+  } else if (id?.startsWith('wcam-')) {
+    // Windy public webcam: fly to it + open the preview PiP
+    status.textContent = webcams.select(id)
   } else {
     sats.clearOrbit()
     viewer.trackedEntity = undefined

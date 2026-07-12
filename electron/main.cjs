@@ -48,28 +48,31 @@ const ROUTES = [
   { prefix: '/feeds/oil', target: 'https://fred.stlouisfed.org', path: '/graph/fredgraph.csv', keepQuery: true },
   { prefix: '/feeds/gdelt', target: 'https://api.gdeltproject.org', path: '/api/v1/gkg_geojson', clean: true },
   { prefix: '/feeds/cables', target: 'https://www.submarinecablemap.com', path: '/api/v3/cable/cable-geo.json', clean: true },
+  { prefix: '/feeds/windy', target: 'https://api.windy.com', path: '/webcams/api/v3/webcams', keepQuery: true, windyKey: true },
   { prefix: '/feeds/llm', target: 'https://ollama.com', path: '/api/chat', auth: true },
 ]
 
-// OLLAMA_API_KEY: process.env, else a .env in userData (durable, user-writable,
-// survives installer updates), beside a portable exe, or the repo root (dev).
-// Never bundled; the LLM caption/Q&A degrades gracefully without it.
-function loadKey() {
-  if (process.env.OLLAMA_API_KEY) return process.env.OLLAMA_API_KEY
+// API keys: process.env, else a .env in userData (durable, user-writable, survives
+// installer updates), beside a portable exe, or the repo root (dev). Never bundled;
+// each dependent feature degrades gracefully without its key.
+function loadKey(name) {
+  if (process.env[name]) return process.env[name]
   const files = [
     path.join(app.getPath('userData'), '.env'),
     path.join(path.dirname(process.execPath), '.env'),
     path.join(__dirname, '..', '.env'),
   ]
+  const re = new RegExp(`^\\s*${name}\\s*=\\s*(.+?)\\s*$`, 'm')
   for (const f of files) {
     try {
-      const m = fs.readFileSync(f, 'utf8').match(/^\s*OLLAMA_API_KEY\s*=\s*(.+?)\s*$/m)
+      const m = fs.readFileSync(f, 'utf8').match(re)
       if (m) return m[1].replace(/^["']|["']$/g, '')
     } catch {}
   }
   return null
 }
 let OLLAMA_API_KEY = null // resolved in createWindow (after app is ready, so getPath works)
+let WINDY_API_KEY = null
 
 const MIME = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css',
@@ -85,6 +88,7 @@ function proxyFeed(route, req, res, u) {
   const headers = { host: target.host, 'user-agent': UA, accept: req.headers.accept || '*/*' }
   if (!route.clean && req.headers['content-type']) headers['content-type'] = req.headers['content-type']
   if (route.auth && OLLAMA_API_KEY) headers.authorization = `Bearer ${OLLAMA_API_KEY}`
+  if (route.windyKey && WINDY_API_KEY) headers['x-windy-api-key'] = WINDY_API_KEY
   const preq = https.request(
     { method: req.method, hostname: target.hostname, port: 443, path: route.keepQuery ? route.path + u.search : route.path, headers },
     (pres) => {
@@ -239,7 +243,8 @@ function showError(w, msg) {
 }
 
 async function createWindow() {
-  OLLAMA_API_KEY = loadKey()
+  OLLAMA_API_KEY = loadKey('OLLAMA_API_KEY')
+  WINDY_API_KEY = loadKey('WINDY_API_KEY')
   buildMenu()
 
   const saved = onScreen(loadState())

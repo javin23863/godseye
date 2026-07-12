@@ -39,6 +39,16 @@ export default defineConfig(({ mode }) => {
       rewrite: (p) => p.replace(/^\/feeds\/oil/, '/graph/fredgraph.csv'),
     },
   }
+  if (env.WINDY_API_KEY) {
+    // Windy Webcams v3 — key injected as a header server-side, never in the bundle.
+    // rewrite only swaps the prefix so the ?nearby=&include= query is preserved.
+    proxy['/feeds/windy'] = {
+      target: 'https://api.windy.com',
+      changeOrigin: true,
+      rewrite: (p) => p.replace(/^\/feeds\/windy/, '/webcams/api/v3/webcams'),
+      headers: { 'x-windy-api-key': env.WINDY_API_KEY },
+    }
+  }
   if (env.OLLAMA_API_KEY) {
     // LLM key never reaches the bundle — proxy injects the Authorization header
     proxy['/feeds/llm'] = {
