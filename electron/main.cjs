@@ -48,6 +48,12 @@ const ROUTES = [
   { prefix: '/feeds/oil', target: 'https://fred.stlouisfed.org', path: '/graph/fredgraph.csv', keepQuery: true },
   { prefix: '/feeds/gdelt', target: 'https://api.gdeltproject.org', path: '/api/v1/gkg_geojson', clean: true },
   { prefix: '/feeds/cables', target: 'https://www.submarinecablemap.com', path: '/api/v3/cable/cable-geo.json', clean: true },
+  // news-intel wave (2026-07-13) — mirrors vite.config.ts routes
+  { prefix: '/feeds/newsdoc', target: 'https://api.gdeltproject.org', path: '/api/v2/doc/doc?query=%28war%20OR%20conflict%20OR%20strike%20OR%20missile%20OR%20attack%20OR%20military%20OR%20markets%20OR%20oil%20OR%20inflation%29&mode=artlist&format=json&maxrecords=75&timespan=1h', clean: true },
+  { prefix: '/feeds/rssnews', target: 'https://news.google.com', path: '/rss?hl=en-US&gl=US&ceid=US:en', clean: true },
+  { prefix: '/feeds/fires', target: 'https://firms.modaps.eosdis.nasa.gov', path: '/data/active_fire/noaa-20-viirs-c2/csv/J1_VIIRS_C2_Global_24h.csv', clean: true },
+  { prefix: '/feeds/nwsalerts', target: 'https://api.weather.gov', path: '/alerts/active', clean: true },
+  { prefix: '/feeds/ioda', target: 'https://api.ioda.inetintel.cc.gatech.edu', path: '/v2/outages/summary', keepQuery: true },
   { prefix: '/feeds/windy', target: 'https://api.windy.com', path: '/webcams/api/v3/webcams', keepQuery: true, windyKey: true },
   { prefix: '/feeds/llm', target: 'https://ollama.com', path: '/api/chat', auth: true },
 ]
