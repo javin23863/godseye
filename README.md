@@ -18,6 +18,7 @@ Working app, milestones M0–M5 plus the Hormuz analytics suite ([06-roadmap](do
 - **Scenes** — 6 cities × 5 POI chips (Q/W/E/R/T), shot planner, orbit camera, Nominatim search.
 - **4D playback** — every live refresh records to IndexedDB; PLAYBACK scrubs the archive at 1×–6h/s; satellites re-propagate at the playback instant.
 - **Voice + AI** — Web Speech commands + free-text Q&A, DMS/alt/REC telemetry, LLM SUMMARY caption (Ollama `minimax-m3:cloud`, falls back to a template).
+- **News-intel wave (2026-07-13, video-gap parity)** — **LIVE NEWS FEED** panel (GDELT DOC 2.0 + Google News RSS, 90s poll, distinct-domain corroboration chips CONFIRMED/LIKELY/PLAUSIBLE, category/source filters), **CONFLICT ZONES** (16 curated indicative polygons: active/contested/disputed), **ACTIVE FIRES** (NASA FIRMS VIIRS 24h, keyless), **WX ALERTS (US)** (NWS active alerts, severity-drawn polygons), **NET OUTAGES** (IODA country-level 24h signals), **FIN. STRESS** board (FRED WTI/Brent/NatGas/VIX/GVZ gold-vol with hub markers colored by 5d change), **REGION INTEL** (arm + click anywhere → LLM assessment grounded only in own-layer evidence within 800 km, template fallback, 20s LLM deadline). Verify: `node scripts/verify-newsint.mjs`.
 
 Keys (all free-tier, in gitignored `.env` — copy `.env.example`): `VITE_GOOGLE_TILES_KEY` (3D tiles), `VITE_AISSTREAM_KEY` (ships), `OLLAMA_API_KEY` (AI caption/Q&A, injected server-side by the proxy). None required — the app degrades gracefully without each.
 

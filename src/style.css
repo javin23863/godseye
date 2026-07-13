@@ -387,6 +387,27 @@ body.clean-ui #share-bar { display: none; }
 #brief-panel .brief-copy:disabled { color: #455a64; cursor: default; }
 body.clean-ui #brief-btn, body.clean-ui #brief-panel { display: none; }
 
+/* -- region intel: click-target LLM assessment popup (mirrors #brief-panel) -- */
+#regionintel {
+  position: absolute; bottom: 44px; left: 16px; width: 300px; max-height: 56vh; overflow-y: auto;
+  background: rgba(8, 14, 18, 0.92); border: 1px solid #2e7d32;
+  border-radius: 6px; padding: 8px 10px; font-size: 10px; letter-spacing: 1px; color: #9ccc65;
+}
+#regionintel h3 { font-size: 10px; letter-spacing: 3px; color: #78909c; margin-bottom: 6px; }
+#regionintel .regionintel-target { font-size: 9px; color: #4fc3f7; border-bottom: 1px solid #1a2327; padding-bottom: 4px; margin-bottom: 6px; }
+#regionintel .regionintel-body { font-size: 10px; line-height: 1.45; white-space: pre-wrap; }
+#regionintel .regionintel-close {
+  position: absolute; top: 6px; right: 8px; font: inherit; font-size: 9px; color: #78909c;
+  background: transparent; border: 1px solid #37474f; border-radius: 3px; padding: 1px 5px; cursor: pointer;
+}
+#regionintel .regionintel-close:hover { color: #fff; border-color: #ff8a80; }
+#regionintel .regionintel-copy {
+  margin-top: 8px; font: inherit; font-size: 9px; letter-spacing: 2px; color: #ffab40;
+  background: transparent; border: 1px solid #37474f; border-radius: 4px; padding: 4px 10px; cursor: pointer;
+}
+#regionintel .regionintel-copy:hover { color: #fff; border-color: #ffab40; }
+body.clean-ui #regionintel, body.clean-ui #newsfeed, body.clean-ui #finstress-panel { display: none; }
+
 /* -- AI analyst: attention ranking + NL query (copilot) -------- */
 #analyst {
   position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 300px;

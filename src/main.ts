@@ -43,6 +43,14 @@ import { init as initBoards } from './boards'
 import { initGibs } from './gibs'
 import { PassScheduler } from './passes'
 import { NewsLayer } from './news'
+import { NewsFeedPanel } from './newsfeed'
+import { ZonesLayer } from './zones'
+import { FiresLayer } from './fires'
+import { AlertsLayer } from './alerts'
+import { OutagesLayer } from './outages'
+import { FinStressLayer } from './finstress'
+import { RegionIntel } from './regionintel'
+import { ZONES_DATA } from './zones-data.mjs'
 import { setupKiosk } from './kiosk'
 import { GlobalInfraLayer, SubmarineCableLayer } from './global-infra'
 import { init as initBrief } from './brief'
@@ -465,6 +473,131 @@ newsBtn.onclick = async () => {
   newsBtn.disabled = false
 }
 
+// -- LIVE NEWS FEED panel: GDELT DOC 2.0 + Google News RSS, 90s poll, corroboration chips --
+// Feed items carry no coordinates (artlist has none) — click just surfaces the story in the
+// status line; the NEWS HOTSPOTS pins remain the geographic view of the same picture.
+const newsfeed = new NewsFeedPanel((item) => {
+  status.textContent = `FEED: [${item.chip}] ${item.title.toUpperCase().slice(0, 90)} · ${item.domain}`
+})
+newsfeed.setVisible(false)
+const feedBtn = document.createElement('button')
+feedBtn.id = 'newsfeed-toggle'
+feedBtn.textContent = '└ LIVE FEED'
+document.getElementById('layers')!.appendChild(feedBtn)
+feedBtn.onclick = () => {
+  const on = !feedBtn.classList.contains('active')
+  feedBtn.classList.toggle('active', on)
+  newsfeed.setVisible(on)
+  if (on) newsfeed.start()
+  else newsfeed.stop()
+  status.textContent = on ? 'NEWS FEED: LIVE (GDELT+RSS, 90S POLL)' : 'NEWS FEED: OFF'
+}
+
+// -- conflict zones: curated indicative polygons (active/contested/disputed) --
+let setZonesCount: (n: number) => void = () => {}
+const zones = new ZonesLayer(viewer, (n) => setZonesCount(n))
+setZonesCount = addLayerRow('CONFLICT ZONES', zones)
+setZonesCount(zones.count) // constructor already rendered the polygons
+zones.shown = false // opt-in — indicative shading, not operational data
+
+// -- active fires (NASA FIRMS VIIRS 24h, on-demand) ---------------------------
+let setFiresCount: (n: number) => void = () => {}
+const fires = new FiresLayer(viewer, (n) => setFiresCount(n))
+setFiresCount = addLayerRow('ACTIVE FIRES', fires, { onDemand: true })
+setFiresCount(0)
+const firesBtn = document.createElement('button')
+firesBtn.id = 'fires-scan'
+firesBtn.textContent = '└ SCAN FIRES'
+document.getElementById('layers')!.appendChild(firesBtn)
+firesBtn.onclick = async () => {
+  firesBtn.disabled = true
+  status.textContent = 'FIRES: PULLING FIRMS VIIRS 24H…'
+  status.textContent = await fires.scan()
+  firesBtn.disabled = false
+}
+
+// -- weather alerts (NWS active, US-only) -------------------------------------
+let setAlertsCount: (n: number) => void = () => {}
+const wxAlerts = new AlertsLayer(viewer, (n) => setAlertsCount(n))
+setAlertsCount = addLayerRow('WX ALERTS (US)', wxAlerts, { onDemand: true })
+setAlertsCount(0)
+const alertsBtn = document.createElement('button')
+alertsBtn.id = 'alerts-scan'
+alertsBtn.textContent = '└ SCAN ALERTS'
+document.getElementById('layers')!.appendChild(alertsBtn)
+alertsBtn.onclick = async () => {
+  alertsBtn.disabled = true
+  status.textContent = 'WX: PULLING NWS ACTIVE ALERTS…'
+  status.textContent = await wxAlerts.scan()
+  alertsBtn.disabled = false
+}
+
+// -- net outages (IODA country-level, last 24h) -------------------------------
+let setOutagesCount: (n: number) => void = () => {}
+const outages = new OutagesLayer(viewer, (n) => setOutagesCount(n))
+setOutagesCount = addLayerRow('NET OUTAGES', outages, { onDemand: true })
+setOutagesCount(0)
+const outagesBtn = document.createElement('button')
+outagesBtn.id = 'outages-scan'
+outagesBtn.textContent = '└ SCAN OUTAGES'
+document.getElementById('layers')!.appendChild(outagesBtn)
+outagesBtn.onclick = async () => {
+  outagesBtn.disabled = true
+  status.textContent = 'OUTAGES: PULLING IODA 24H SUMMARY…'
+  status.textContent = await outages.scan()
+  outagesBtn.disabled = false
+}
+
+// -- fin. stress board: FRED multi-instrument stress panel + hub markers ------
+let setFinCount: (n: number) => void = () => {}
+const finstress = new FinStressLayer(viewer, (n) => setFinCount(n))
+setFinCount = addLayerRow('FIN. STRESS', finstress, { onDemand: true })
+setFinCount(0)
+finstress.shown = false // panel + markers hidden until first SCAN FRED
+const finBtn = document.createElement('button')
+finBtn.id = 'finstress-scan'
+finBtn.textContent = '└ SCAN FRED'
+document.getElementById('layers')!.appendChild(finBtn)
+finBtn.onclick = async () => {
+  finBtn.disabled = true
+  finstress.shown = true
+  status.textContent = 'FIN: PULLING FRED SERIES…'
+  await finstress.scan()
+  status.textContent = `FIN: ${finstress.count}/5 INSTRUMENTS LIVE`
+  finBtn.disabled = false
+}
+
+// -- region intel: arm INTEL, click the globe -> LLM assessment from own-layer evidence --
+const zoneCentroids = ZONES_DATA.map((z: { name: string; status: string; ring: [number, number][] }) => ({
+  name: z.name,
+  status: z.status,
+  lat: z.ring.reduce((s, p) => s + p[1], 0) / z.ring.length,
+  lon: z.ring.reduce((s, p) => s + p[0], 0) / z.ring.length,
+}))
+const regionIntel = new RegionIntel(viewer, () => ({
+  newsItems: news.items,
+  quakes: quakes.items,
+  fires: fires.items,
+  outages: outages.items,
+  zones: zoneCentroids,
+  flightsCount: flights.count,
+}))
+const intelBtn = document.createElement('button')
+intelBtn.id = 'intel-arm'
+intelBtn.textContent = '└ REGION INTEL (CLICK)'
+document.getElementById('layers')!.appendChild(intelBtn)
+intelBtn.onclick = () => {
+  if (regionIntel.armed) {
+    regionIntel.disarm()
+    intelBtn.classList.remove('active')
+    status.textContent = 'REGION INTEL: DISARMED'
+  } else {
+    regionIntel.arm()
+    intelBtn.classList.add('active')
+    status.textContent = 'REGION INTEL: CLICK A TARGET ON THE GLOBE'
+  }
+}
+
 // -- tripwires + sentinel (turn the viewer into a watchstander) --------------
 // Arm an AOI + condition; a ~20s timer folds the latest recorded snapshot of every live
 // layer into the rules engine and, on any rising-edge fire, raises a desktop notification +
@@ -734,7 +867,7 @@ new ScreenSpaceEventHandler(viewer.scene.canvas).setInputAction((click: { positi
   const id: string | undefined = defined(picked) ? picked.id?.id : undefined
   if (typeof id === 'string' && id.endsWith('-trail')) return // glow trails aren't inspectable
   // pulsing target-lock reticle on anything inspectable
-  const RETICLE_PREFIXES = ['sat-', 'os-', 'mil-', 'ship-', 'cctv-', 'news-', 'wcam-', 'fx-']
+  const RETICLE_PREFIXES = ['sat-', 'os-', 'mil-', 'ship-', 'cctv-', 'news-', 'wcam-', 'fx-', 'zone-', 'fires-', 'alerts-', 'outage-', 'finstress-']
   reticle.lock(typeof id === 'string' && RETICLE_PREFIXES.some((p) => id.startsWith(p)) ? picked.id : undefined)
   // pattern-of-life (additive): profile any tracked entity / AOI marker alongside its normal action
   if (PolLayer.handles(id)) void pol.inspect(picked.id)
@@ -764,6 +897,16 @@ new ScreenSpaceEventHandler(viewer.scene.canvas).setInputAction((click: { positi
   } else if (id?.startsWith('wcam-')) {
     // Windy public webcam: fly to it + open the preview PiP
     status.textContent = webcams.select(id)
+  } else if (id?.startsWith('zone-')) {
+    status.textContent = zones.select(id)
+  } else if (id?.startsWith('fires-')) {
+    status.textContent = fires.select(id)
+  } else if (id?.startsWith('alerts-')) {
+    status.textContent = wxAlerts.select(id.replace(/-poly$/, ''))
+  } else if (id?.startsWith('outage-')) {
+    status.textContent = outages.select(id)
+  } else if (id?.startsWith('finstress-')) {
+    status.textContent = finstress.select(id)
   } else {
     sats.clearOrbit()
     viewer.trackedEntity = undefined

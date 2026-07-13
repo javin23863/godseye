@@ -37,6 +37,11 @@ export class NewsLayer {
     this.ds.show = v
   }
 
+  /** Last scan's pins (lat/lon/name/count) — region-intel evidence provider. */
+  get items(): NewsPin[] {
+    return [...this.pins.values()]
+  }
+
   /** Fetch the GDELT feed, filter by query, redraw pins. Returns a status line. */
   async scan(query: string): Promise<string> {
     if (this.busy) return 'NEWS: BUSY'

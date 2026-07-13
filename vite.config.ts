@@ -109,6 +109,28 @@ export default defineConfig(({ mode }) => {
     '/feeds/mil3': feed('https://api.airplanes.live', '/v2/mil'),
     // GDELT v1 GKG GeoJSON (news hotspots) — no CORS header; v2 /api/v2/geo/geo is 404 upstream
     '/feeds/gdelt': feed('https://api.gdeltproject.org', '/api/v1/gkg_geojson'),
+    // GDELT DOC 2.0 artlist (live news feed) — broad conflict/markets query baked server-side.
+    // NOT '/feeds/gdeltdoc': proxy keys match by prefix in order, '/feeds/gdelt' would shadow it.
+    '/feeds/newsdoc': feed(
+      'https://api.gdeltproject.org',
+      '/api/v2/doc/doc?query=' +
+        encodeURIComponent('(war OR conflict OR strike OR missile OR attack OR military OR markets OR oil OR inflation)') +
+        '&mode=artlist&format=json&maxrecords=75&timespan=1h',
+    ),
+    // Google News world RSS (live news feed's second source) — no CORS header
+    '/feeds/rssnews': feed('https://news.google.com', '/rss?hl=en-US&gl=US&ceid=US:en'),
+    // NASA FIRMS NOAA-20 VIIRS 24h global active-fire CSV — keyless public archive link
+    // (the suomi-npp variant served header-only rows at build time; api/area/ needs a MAP_KEY)
+    '/feeds/fires': feed('https://firms.modaps.eosdis.nasa.gov', '/data/active_fire/noaa-20-viirs-c2/csv/J1_VIIRS_C2_Global_24h.csv'),
+    // NWS active weather alerts (US) — needs an identifying User-Agent, feed() already sets one
+    '/feeds/nwsalerts': feed('https://api.weather.gov', '/alerts/active'),
+    // IODA internet-outage country summary — keyless, no CORS; the client builds ?from=&until=
+    // epochs per request, so this preserves the query (feed()'s fixed rewrite would drop it)
+    '/feeds/ioda': {
+      target: 'https://api.ioda.inetintel.cc.gatech.edu',
+      changeOrigin: true,
+      rewrite: (p) => p.replace(/^\/feeds\/ioda/, '/v2/outages/summary'),
+    },
     // TeleGeography submarine-cable set — no CORS header
     '/feeds/cables': feed('https://www.submarinecablemap.com', '/api/v3/cable/cable-geo.json'),
     // FRED oil-price CSV — no CORS header, proxy preserves the ?id= query (DS-17)
