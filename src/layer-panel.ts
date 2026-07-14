@@ -14,6 +14,7 @@ export function addLayerRow(
   const layersDiv = document.getElementById('layers')!
   const label = document.createElement('label')
   label.className = 'layer-row'
+  label.dataset.layer = name
   if (opts?.onDemand) label.dataset.onDemand = 'true' // populates on user action / slow stream — verify won't require >0
   const box = document.createElement('input')
   box.type = 'checkbox'

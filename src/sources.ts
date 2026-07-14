@@ -102,14 +102,14 @@ export const SOURCES: Record<string, Source> = {
   gate: {
     label: 'HORMUZ GATE',
     provider: 'Derived (geometric crossing tripwire × ships history)',
-    url: 'https://github.com/bilawalsidhu/gods-eye-view',
+    url: 'https://github.com/javin23863/godseye',
     freshness: 'on-demand replay over recorded ship tracks',
     limits: 'Derived geometry, no feed; crossing tally bounded by AIS coverage of the recorded window',
   },
   infra: {
     label: 'CRITICAL INFRA',
     provider: 'Curated (godseye scene manifest)',
-    url: 'https://github.com/bilawalsidhu/gods-eye-view',
+    url: 'https://github.com/javin23863/godseye',
     freshness: 'static curated dataset',
     limits: 'Hand-curated MVP (Gulf pipelines/chokepoints/refineries/desalination); not a live feed',
   },

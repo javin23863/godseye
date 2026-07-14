@@ -1,5 +1,7 @@
 # 06 — Roadmap: Milestoned Build Plan
 
+> **Status (2026-07-15):** M0–M5 shipped. M6+ is the remaining backlog. This document preserves the build order and rationale; it is not a claim that the repository is still spec-only.
+
 Audience: the dev agent building **godseye**. Milestones are strictly ordered; each ends in a demoable state. IDs (CAP-xx / DS-xx / UI-xx / STK-xx) resolve to the capability, data-source, UI, and stack spec docs in this folder. All feeds are public/open data — keep every milestone that way (no scraping private data, no auth bypass, respect each feed's ToS).
 
 Sizes: **S** = ~days, **M** = ~1–2 weeks, **L** = ~2–4 weeks of agent effort. (Original was built in ~3 days by one operator driving multiple coding agents — `https://www.linkedin.com/posts/bilawalsidhu_i-built-worldview-in-three-days-but-i-also-activity-7432079812619550720-O3Gb`, STK-08 — so sizes assume parity *plus* the hardening the original skipped.)

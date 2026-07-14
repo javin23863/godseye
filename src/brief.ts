@@ -68,7 +68,7 @@ function markdown(narrative: string, badges: SourceBadge[]): string {
   const sources = badges.length
     ? badges.map((b) => `- **${b.label}** — ${b.provider} · ${b.freshness} · ${b.limits}`).join('\n')
     : '- (no active sources)'
-  return `# GOD'S EYE BRIEF\n\n${narrative}\n\n## Sources\n\n${sources}\n`
+  return `# GODSEYE BRIEF\n\n${narrative}\n\n## Sources\n\n${sources}\n`
 }
 
 function render(panel: HTMLElement, narrative: string, badges: SourceBadge[], md: string, _p: Picture): void {

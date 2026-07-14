@@ -216,7 +216,7 @@ The spec above was handed off, then the same operator said **"begin"** — so th
 
 ## State at handoff
 
-- **41 pure-logic unit tests** (`node --test "tests/*.test.mjs"`), `tsc --noEmit` + `vite build` clean.
+- **41 pure-logic unit tests at handoff** (`node --test "tests/*.test.mjs"`), `tsc --noEmit` + `vite build` clean. The current suite has 176 tests as of 2026-07-15.
 - **6 headless verify scripts** — `verify-m0` (every auto-layer populated + screenshot), `verify-styles`, `verify-playback`, `verify-keyed`, `verify-hormuz`, `verify-backlog`.
 - **Feeds are all public/open OSINT data.** Keys (Google tiles / aisstream / Ollama) live in a gitignored `.env`; the app degrades gracefully without each.
 

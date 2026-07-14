@@ -46,3 +46,22 @@ test('empty and partial states round-trip', () => {
   const partial = { v: 1, cam: { lon: 10, lat: 20, height: 30, heading: 0.1, pitch: -0.2 }, layers: ['flights'] }
   assert.deepEqual(decodeState(encodeState(partial)), partial)
 })
+
+test('v2 scene round-trips display and observation metadata', () => {
+  const state = {
+    v: 2,
+    observedAt: '2026-07-15T03:04:05.000Z',
+    cam: { lon: 56.3, lat: 26.5, height: 800_000, heading: 1.2, pitch: -0.8 },
+    t: 1_752_000_000_000,
+    layers: ['ships', 'gpsjam'],
+    style: 'FLIR',
+    basemap: 'google3d',
+  }
+  assert.deepEqual(decodeState(encodeState(state)), state)
+})
+
+test('v2 rejects malformed integration state while v1 stays compatible', () => {
+  assert.equal(decodeState(encodeState({ v: 2, observedAt: 'not-a-date', cam: {} })), null)
+  assert.equal(decodeState(encodeState({ v: 3, cam: {} })), null)
+  assert.deepEqual(decodeState(encodeState({ v: 1 })), { v: 1 })
+})

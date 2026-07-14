@@ -94,7 +94,7 @@ export function bootSplash() {
   el.appendChild(pre)
   document.body.appendChild(el)
   const lines = [
-    "GOD'S EYE // ORBITAL COMMAND",
+    'GODSEYE // ORBITAL COMMAND',
     'INIT RENDER CORE ............ OK',
     'TASKING LIVE FEEDS .......... OK',
     'ALL LAYERS ONLINE',

@@ -1,8 +1,8 @@
-# godseye
+# Godseye
 
-Spec, documentation, and roadmap for rebuilding **God's Eye View** — Bilawal Sidhu's browser-based geospatial OSINT command center (CesiumJS + Google Photorealistic 3D Tiles globe, live OSINT layers, 4D timeline playback, sensor-style shaders, voice + AI analysis).
+Working implementation, evidence, and build history for **Godseye** — an independently owned browser-based geospatial OSINT command center (CesiumJS + Google Photorealistic 3D Tiles globe, live OSINT layers, 4D timeline playback, sensor-style shaders, voice + AI analysis).
 
-The original repo ([bilawalsidhu/gods-eye-view](https://github.com/bilawalsidhu/gods-eye-view)) is a placeholder with no code (release targeted July 2026), so the entire spec was reverse-engineered from his 5 YouTube videos (frames + transcripts), repo assets, and a web sweep — then adversarially verified (122/125 claims CONFIRMED).
+The upstream inspiration ([bilawalsidhu/gods-eye-view](https://github.com/bilawalsidhu/gods-eye-view)) was a placeholder when this work began. This independent implementation was reverse-engineered from five public videos (frames + transcripts), repo assets, and a web sweep; the documents preserve that evidence and provenance.
 
 ## Build status
 
@@ -28,7 +28,7 @@ Remaining backlog: worker-thread parsing/clustering (a performance hardening —
 npm install
 cp .env.example .env   # optional: add keys
 npm run dev            # http://localhost:5173
-npm test               # 41 pure-logic unit tests
+npm test               # 176 pure-logic unit tests
 npm run build && npm run preview
 node scripts/verify-m0.mjs        # headless smoke: every auto-layer populated + screenshot
 node scripts/verify-styles.mjs    # cycles all six style presets
@@ -50,7 +50,7 @@ Feed proxying: OpenSky, the military mirrors, FRED oil, and the LLM lack third-p
 | [03-data-sources](docs/03-data-sources.md) | Feed catalog — 24 data sources with providers, free tiers, rate limits, fallbacks |
 | [04-ui-spec](docs/04-ui-spec.md) | Interface spec — layout, HUD readouts, label conventions, style presets, interactions |
 | [05-improvements](docs/05-improvements.md) | Improvement backlog beyond parity — 25 ranked items |
-| [06-roadmap](docs/06-roadmap.md) | Milestoned build plan M0–M6+ with exit criteria and risk register |
+| [06-roadmap](docs/06-roadmap.md) | Historical milestone plan plus current backlog and risk register |
 | [07-session-notes](docs/07-session-notes.md) | Evidence log — methodology, per-video notes, verification results, open gaps |
 
 Scope note: all feeds are public/open data (OSINT visualization). No scraping of private data, no auth bypass.

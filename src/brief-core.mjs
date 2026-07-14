@@ -25,7 +25,7 @@ export function buildBriefPrompt(picture) {
     ? picture.events.map((e) => `- ${e.kind}: ${e.text}`).join('\n')
     : '- none flagged'
   return [
-    `GOD'S EYE situation brief. Observation window: ${picture.windowLabel}.`,
+    `GODSEYE situation brief. Observation window: ${picture.windowLabel}.`,
     `Active layers (with live counts): ${layers}.`,
     `Salient events:`,
     events,

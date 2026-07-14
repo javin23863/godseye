@@ -1,6 +1,6 @@
 // Scene-state capture/apply (deep-links + saved boards): read the live cesium camera pose,
 // merge in the non-camera view bits (playhead time, layer toggles, AOIs) the caller supplies,
-// and fly the camera back on restore. Codec is in scene-state.mjs (headless, node --test'able);
+// and fly the camera back on restore. Codec is in scene-state-codec.mjs (headless, node --test'able);
 // this file is only the cesium/DOM seam.
 import { Cartesian3, Math as CMath, Viewer } from 'cesium'
 import { decodeState, encodeState } from './scene-state-codec.mjs'
@@ -11,22 +11,42 @@ export interface Aoi {
   radiusKm: number
   name?: string
 }
-export interface SceneState {
+export interface SceneStateV1 {
   v: 1
   cam: { lon: number; lat: number; height: number; heading: number; pitch: number }
   t?: number
   layers?: string[]
   aois?: Aoi[]
 }
+export interface SceneStateV2 {
+  v: 2
+  cam: { lon: number; lat: number; height: number; heading: number; pitch: number }
+  /** ISO-8601 instant when the scene was captured, distinct from an optional playback cursor. */
+  observedAt: string
+  t?: number
+  layers?: string[]
+  aois?: Aoi[]
+  style?: string
+  basemap?: string
+}
+export type SceneState = SceneStateV1 | SceneStateV2
 /** Non-camera view bits the caller owns — merged into the state, re-applied by hand on restore. */
-export type SceneExtras = Pick<SceneState, 't' | 'layers' | 'aois'>
+export interface SceneExtras {
+  observedAt?: string
+  t?: number
+  layers?: string[]
+  aois?: Aoi[]
+  style?: string
+  basemap?: string
+}
 
 /** Snapshot the current camera pose + caller-supplied extras into a serializable state. */
-export function captureState(viewer: Viewer, extras: SceneExtras = {}): SceneState {
+export function captureState(viewer: Viewer, extras: SceneExtras = {}): SceneStateV2 {
   const c = viewer.camera
   const carto = c.positionCartographic
-  const state: SceneState = {
-    v: 1,
+  const state: SceneStateV2 = {
+    v: 2,
+    observedAt: extras.observedAt ?? new Date().toISOString(),
     cam: {
       lon: CMath.toDegrees(carto.longitude),
       lat: CMath.toDegrees(carto.latitude),
@@ -38,6 +58,8 @@ export function captureState(viewer: Viewer, extras: SceneExtras = {}): SceneSta
   if (extras.t !== undefined) state.t = extras.t
   if (extras.layers) state.layers = extras.layers
   if (extras.aois) state.aois = extras.aois
+  if (extras.style) state.style = extras.style
+  if (extras.basemap) state.basemap = extras.basemap
   return state
 }
 
@@ -53,7 +75,9 @@ export function applyState(viewer: Viewer, state: SceneState): SceneExtras {
     orientation: { heading, pitch, roll: 0 },
     duration: 1.5,
   })
-  return { t: state.t, layers: state.layers, aois: state.aois }
+  return state.v === 2
+    ? { observedAt: state.observedAt, t: state.t, layers: state.layers, aois: state.aois, style: state.style, basemap: state.basemap }
+    : { t: state.t, layers: state.layers, aois: state.aois }
 }
 
 /** '#s='-prefixed hash fragment for a shareable deep-link. */
