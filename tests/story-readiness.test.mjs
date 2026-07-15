@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { needsStoryFallback, storySafeBounds, summarizeStoryReadiness, summarizeStoryTiles } from '../src/story-readiness.mjs'
+import { orderedStoryLabels } from '../src/presentation.ts'
 
 const passing = () => ({
   camera: { level: 'pass', detail: 'globe visible' },
@@ -57,4 +58,20 @@ test('Story tile readiness blocks visible 3D tilesets until they finish loading'
   assert.equal(summarizeStoryTiles(true, [{ tilesLoaded: false }]).level, 'fail')
   assert.match(summarizeStoryTiles(true, [{ tilesLoaded: false }]).detail, /visible 3D tileset/)
   assert.equal(summarizeStoryTiles(true, [{ tilesLoaded: true }]).level, 'pass')
+})
+
+test('Story tile readiness can warn on fully rendered coverage while refinements continue', () => {
+  assert.deepEqual(summarizeStoryTiles(false, [], true), {
+    level: 'warn',
+    detail: 'visible globe coverage is rendered; background refinement remains',
+  })
+})
+
+test('explicit Story layer order isolates the primary plus three supports', () => {
+  const active = ['EARTHQUAKES 24H', 'FLIGHTS', 'ACTIVE FIRES', 'WX ALERTS (US)', 'NET OUTAGES']
+  assert.deepEqual(
+    orderedStoryLabels(active, ['ACTIVE FIRES', 'WX ALERTS (US)', 'NET OUTAGES', 'EARTHQUAKES 24H', 'FLIGHTS']),
+    ['ACTIVE FIRES', 'WX ALERTS (US)', 'NET OUTAGES', 'EARTHQUAKES 24H'],
+  )
+  assert.deepEqual(orderedStoryLabels(active), active.slice(0, 4))
 })

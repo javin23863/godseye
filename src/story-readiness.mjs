@@ -9,11 +9,14 @@ export function storySafeBounds(width, height) {
   return { left: insetX, top: insetY, right: width - insetX, bottom: height - captionReserve, captionReserve }
 }
 
-export function summarizeStoryTiles(globeTilesLoaded, visibleTilesets = []) {
-  if (!globeTilesLoaded) return { level: 'fail', detail: 'globe tiles are still loading' }
+export function summarizeStoryTiles(globeTilesLoaded, visibleTilesets = [], renderedCoverageReady = false) {
+  if (!globeTilesLoaded && !renderedCoverageReady) return { level: 'fail', detail: 'globe tiles are still loading' }
   const pending = visibleTilesets.filter((tileset) => !tileset.tilesLoaded).length
   if (pending) {
     return { level: 'fail', detail: `${pending} visible 3D tileset${pending === 1 ? '' : 's'} still loading` }
+  }
+  if (!globeTilesLoaded) {
+    return { level: 'warn', detail: 'visible globe coverage is rendered; background refinement remains' }
   }
   return {
     level: 'pass',

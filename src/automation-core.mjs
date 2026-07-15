@@ -62,9 +62,14 @@ export function createAutomationLifecycle(handlers) {
     }
     if (request.op === 'begin') {
       if (phase !== 'idle') throw new Error(`begin requires idle state; current state is ${phase}`)
-      const result = await handlers.begin(request)
-      phase = 'recording'
-      return { schema: 'godseye-automation/v1', ok: true, phase, ...result }
+      try {
+        const result = await handlers.begin(request)
+        phase = 'recording'
+        return { schema: 'godseye-automation/v1', ok: true, phase, ...result }
+      } catch (error) {
+        phase = 'idle'
+        throw error
+      }
     }
     if (request.op === 'finish') {
       if (phase !== 'recording') throw new Error(`finish requires recording state; current state is ${phase}`)

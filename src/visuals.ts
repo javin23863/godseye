@@ -49,6 +49,9 @@ export function addNightLights(viewer: Viewer): ImageryLayer {
     credit: 'NASA EOSDIS GIBS Black Marble',
   })
   const layer = new ImageryLayer(provider, { dayAlpha: 0, nightAlpha: 1 })
+  provider.errorEvent.addEventListener((error) => {
+    error.retry = error.timesRetried < 2
+  })
   viewer.imageryLayers.add(layer)
   return layer
 }

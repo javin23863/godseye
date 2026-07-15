@@ -127,6 +127,41 @@ export const SOURCES: Record<string, Source> = {
     freshness: 'recomputed per satellite pass (intermittent)',
     limits: 'Derived geometry, no feed; fan lines only when a watchlist bird clears the elevation mask',
   },
+  fires: {
+    label: 'ACTIVE FIRES',
+    provider: 'NASA FIRMS NOAA-20 VIIRS 375m',
+    url: 'https://firms.modaps.eosdis.nasa.gov/',
+    freshness: 'global 24h detections, on-demand scan',
+    limits: 'Active-fire points, not fire perimeters; public archive CSV capped to the strongest 1,500 detections in-app',
+  },
+  alerts: {
+    label: 'WX ALERTS (US)',
+    provider: 'US National Weather Service active alerts API',
+    url: 'https://www.weather.gov/documentation/services-web-api',
+    freshness: 'active alerts, on-demand scan',
+    limits: 'US coverage only; polygon geometry is present only when supplied by NWS',
+  },
+  outages: {
+    label: 'NET OUTAGES',
+    provider: 'Georgia Tech IODA outage summary',
+    url: 'https://ioda.inetintel.cc.gatech.edu/',
+    freshness: 'country-level signals over the last 24h, on-demand scan',
+    limits: 'Country-centroid visualization; indicates connectivity disruption, not cause or precise outage footprint',
+  },
+  ginfra: {
+    label: 'GLOBAL INFRA',
+    provider: 'Curated Godseye strategic-infrastructure dataset',
+    url: 'https://github.com/javin23863/godseye',
+    freshness: 'static bundled dataset',
+    limits: 'Selected chokepoints, pipelines, ports, refineries, and desalination plants; not an exhaustive registry',
+  },
+  zones: {
+    label: 'CONFLICT ZONES',
+    provider: 'Curated Godseye indicative conflict polygons',
+    url: 'https://github.com/javin23863/godseye',
+    freshness: 'static dated scene context',
+    limits: 'Indicative context only; not a live front line, legal boundary, or authoritative territorial claim',
+  },
 }
 
 /** Registry lookup by layer id; undefined for unknown/unregistered layers. */

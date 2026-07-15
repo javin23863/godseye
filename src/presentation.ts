@@ -5,7 +5,9 @@ export function applyPresentationState(presentation: string | undefined, cleanUi
   if (presentation) document.body.dataset.presentation = presentation
   else delete document.body.dataset.presentation
   document.body.classList.toggle('clean-ui', presentation === 'story' || cleanUi)
-  document.getElementById('story-overlay')?.setAttribute('aria-hidden', String(presentation !== 'story'))
+  const overlay = document.getElementById('story-overlay')
+  overlay?.setAttribute('aria-hidden', String(presentation !== 'story'))
+  if (presentation !== 'story') overlay?.classList.remove('story-locked')
 }
 
 export function updateStoryOverlayView(observedAt: string, context: string, sourceLabels: string[]): void {
@@ -15,12 +17,22 @@ export function updateStoryOverlayView(observedAt: string, context: string, sour
   if (contextElement) contextElement.textContent = context
   const list = document.getElementById('story-source-list')
   if (!list) return
-  list.replaceChildren(...sourceLabels.map((label) => {
+  list.replaceChildren(...sourceLabels.map((label, index) => {
     const item = document.createElement('b')
     item.textContent = label
+    item.style.setProperty('--source-index', String(index))
     return item
   }))
   if (!sourceLabels.length) list.textContent = 'NO ACTIVE REGISTERED SOURCES'
+}
+
+/** Restart the one-shot evidence-lock treatment after Story readiness passes. */
+export function lockStoryOverlay(): void {
+  const overlay = document.getElementById('story-overlay')
+  if (!overlay) return
+  overlay.classList.remove('story-locked')
+  void overlay.offsetWidth
+  overlay.classList.add('story-locked')
 }
 
 export function captureLayerState(): LayerState[] {
@@ -28,16 +40,20 @@ export function captureLayerState(): LayerState[] {
     .map((box) => ({ box, checked: box.checked }))
 }
 
+/** Explicit Story order wins; without one, retain the first four active layers. */
+export function orderedStoryLabels(activeLabels: string[], preferredLabels: string[] = []): string[] {
+  const active = new Set(activeLabels)
+  const preferred = [...new Set(preferredLabels)].filter((label) => active.has(label)).slice(0, 4)
+  return preferred.length ? preferred : activeLabels.slice(0, 4)
+}
+
 /** Keep one primary signal plus at most three supporting signals. */
 export function focusStoryLayers(preferredLabels: string[] = []): number {
   const rows = [...document.querySelectorAll<HTMLLabelElement>('#layers label.layer-row')]
     .map((row) => ({ row, box: row.querySelector<HTMLInputElement>('input[type=checkbox]') }))
     .filter((entry): entry is { row: HTMLLabelElement; box: HTMLInputElement } => Boolean(entry.box?.checked))
-  const preferred = new Map(preferredLabels.map((label, index) => [label, index]))
-  rows.sort((left, right) =>
-    (preferred.get(left.row.dataset.layer ?? '') ?? Number.MAX_SAFE_INTEGER) -
-    (preferred.get(right.row.dataset.layer ?? '') ?? Number.MAX_SAFE_INTEGER))
-  const keep = new Set(rows.slice(0, 4).map(({ box }) => box))
+  const keepLabels = new Set(orderedStoryLabels(rows.map(({ row }) => row.dataset.layer ?? ''), preferredLabels))
+  const keep = new Set(rows.filter(({ row }) => keepLabels.has(row.dataset.layer ?? '')).map(({ box }) => box))
   for (const { box } of rows) if (!keep.has(box)) box.click()
   return Math.max(0, rows.length - keep.size)
 }

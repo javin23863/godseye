@@ -77,4 +77,14 @@ test('automation validates begin input and enforces record/drain lifecycle', asy
   await assert.rejects(() => failedFinish({ op: 'finish' }), /bad evidence/)
   assert.equal((await failedFinish({ op: 'status' })).phase, 'draining')
   assert.equal(await failedFinish({ op: 'drain' }), null)
+
+  const failedBegin = createAutomationLifecycle({
+    status: () => ({}), begin: async () => { throw new Error('recorder unavailable') },
+    finish: async () => ({}), drain: async () => null,
+  })
+  await assert.rejects(
+    () => failedBegin({ op: 'begin', presentation: 'story', camera: { lon: 0, lat: 0, height: 1 } }),
+    /recorder unavailable/,
+  )
+  assert.equal((await failedBegin({ op: 'status' })).phase, 'idle')
 })
