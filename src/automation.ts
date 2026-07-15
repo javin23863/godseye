@@ -184,19 +184,20 @@ export function installAutomation(viewer: Viewer): void {
     compositeContext.fillStyle = 'rgba(245,241,232,.7)'
     compositeContext.font = `400 ${Math.round(10 * scale)}px "Segoe UI", sans-serif`
     compositeContext.fillText(storyContextText, safe.right, padY)
+    compositeContext.textBaseline = 'bottom'
     compositeContext.textAlign = 'left'
     compositeContext.fillStyle = 'rgba(245,241,232,.48)'
-    compositeContext.fillText('OBSERVED', padX, safe.bottom - 30 * scale)
+    compositeContext.fillText('OBSERVED', padX, safe.bottom - 28 * scale)
     compositeContext.fillStyle = '#f5f1e8'
     compositeContext.font = `400 ${Math.round(18 * scale)}px "Segoe UI", sans-serif`
-    compositeContext.fillText(recordingObservedAt?.replace('.000Z', 'Z') ?? '', padX, safe.bottom - 15 * scale)
+    compositeContext.fillText(recordingObservedAt?.replace('.000Z', 'Z') ?? '', padX, safe.bottom)
 
     compositeContext.textAlign = 'right'
     compositeContext.fillStyle = 'rgba(245,241,232,.48)'
     compositeContext.font = `400 ${Math.round(10 * scale)}px "Segoe UI", sans-serif`
-    compositeContext.fillText('ACTIVE SOURCES', safe.right, safe.bottom - 30 * scale)
+    compositeContext.fillText('ACTIVE SOURCES', safe.right, safe.bottom - 28 * scale)
     compositeContext.fillStyle = '#f5f1e8'
-    compositeContext.fillText(storySourceLabels.join('  ·  '), safe.right, safe.bottom - 14 * scale)
+    compositeContext.fillText(storySourceLabels.join('  ·  '), safe.right, safe.bottom)
     compositeContext.textAlign = 'left'
     if (scheduleNext) compositeFrame = requestAnimationFrame(() => drawComposite(true))
   }
@@ -206,7 +207,7 @@ export function installAutomation(viewer: Viewer): void {
     sample.width = 12
     sample.height = 8
     const context = sample.getContext('2d', { willReadFrequently: true })
-    if (!context) return { level: 'warn', detail: 'frame sampling is unavailable' }
+    if (!context) return { level: 'fail', detail: 'frame sampling is unavailable' }
     try {
       context.drawImage(surface, 0, 0, sample.width, sample.height)
       const pixels = context.getImageData(0, 0, sample.width, sample.height).data
@@ -226,7 +227,7 @@ export function installAutomation(viewer: Viewer): void {
       if (spread < 4) return { level: 'fail', detail: 'frame has insufficient visual contrast' }
       return { level: 'pass', detail: `luminance spread ${spread.toFixed(1)}` }
     } catch {
-      return { level: 'warn', detail: 'cross-origin imagery prevented contrast sampling' }
+      return { level: 'fail', detail: 'cross-origin imagery prevented contrast sampling' }
     }
   }
 
@@ -243,7 +244,7 @@ export function installAutomation(viewer: Viewer): void {
       const bounds = element?.getBoundingClientRect()
       return Boolean(element && style && style.display !== 'none' && style.visibility !== 'hidden' &&
         Number(style.opacity) > 0 && bounds && bounds.width > 0 && bounds.height > 0 &&
-        bounds.left >= safe.left && bounds.top >= safe.top && bounds.right <= safe.right && bounds.bottom <= safe.bottom)
+        bounds.left >= safe.left - 1 && bounds.top >= safe.top - 1 && bounds.right <= safe.right + 1 && bounds.bottom <= safe.bottom + 1)
     })
     const cameraHeight = viewer.camera.positionCartographic.height
     const globeVisible = viewer.scene.globe.show && Boolean(viewer.camera.computeViewRectangle(viewer.scene.globe.ellipsoid))
