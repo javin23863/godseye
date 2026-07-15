@@ -396,6 +396,7 @@ export function installAutomation(viewer: Viewer): void {
             flightFallbackHeight = applySafeCamera(request.camera)
             focusWarnings.push(`safe camera fallback applied after ${error instanceof Error ? error.message : 'camera flight failed'}`)
           }
+          if (presentation === 'story' && flightFallbackHeight === undefined) startOrbit(request.camera, request.orbitDegPerSec)
           await wait((request.settleSec ?? 4) * 1000)
           for (const token of request.afterActions ?? []) await applyAction(token)
           if (request.afterActions?.length) await wait((request.actionWaitSec ?? 5) * 1000)
@@ -428,7 +429,7 @@ export function installAutomation(viewer: Viewer): void {
             recordingObservedAt = new Date().toISOString()
             updateStoryOverlay(recordingObservedAt)
           }
-          if (!readiness?.fallbackApplied) startOrbit(request.camera, request.orbitDegPerSec)
+          if (presentation !== 'story') startOrbit(request.camera, request.orbitDegPerSec)
           startRecorder(presentation)
           return { presentation, ...(readiness ? { readiness } : {}) }
         }
