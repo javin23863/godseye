@@ -45,7 +45,7 @@ export function llmSummary(context: string): Promise<string | null> {
 /** Free-text voice question -> one-line answer. */
 export function llmAsk(question: string, context: string): Promise<string | null> {
   return chat(
-    `You are GOD'S EYE, a geospatial OSINT assistant. Answer in ONE short sentence, ALL CAPS. Current display state: ${context}`,
+    `You are GODSEYE, a geospatial OSINT assistant. Answer in ONE short sentence, ALL CAPS. Current display state: ${context}`,
     question,
   )
 }

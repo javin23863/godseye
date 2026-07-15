@@ -6,7 +6,7 @@
 
 ## What THIS repo is
 
-A **spec-only** repository: a dev-agent-ready blueprint to rebuild (and improve on) God's Eye View. **No code yet.** The original is closed-source as of 2026-07-11 (its GitHub repo `bilawalsidhu/gods-eye-view` is a code-less placeholder targeting a July 2026 drop — STK-06), so this spec was reverse-engineered from public evidence and adversarially verified. A coding agent should be able to build the system from docs 01–07 without watching the source videos. Constraint carried through every doc: **all feeds are public/open data — no scraping of private data, no auth bypass, no ToS-violating access.**
+A working independent implementation plus the evidence-backed blueprint used to build it. The upstream inspiration was closed-source when research began, so the specification was reverse-engineered from public evidence and adversarially verified before implementation. Docs 01–07 preserve provenance and design rationale; the application code is the current product truth. Constraint carried through every doc and the implementation: **all feeds are public/open data — no scraping of private data, no auth bypass, no ToS-violating access.**
 
 ## Evidence base
 

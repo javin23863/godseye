@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "main": "electron/main.cjs",
-  "description": "God's Eye — geospatial OSINT globe (CesiumJS + live feeds, 4D playback, sensor shaders, voice + AI). Runs in the browser and as a desktop app.",
+  "description": "Godseye — geospatial OSINT globe (CesiumJS + live feeds, 4D playback, sensor shaders, voice + AI). Runs in the browser and as a desktop app.",
   "author": "javin23863",
   "scripts": {
     "dev": "vite",
@@ -16,7 +16,7 @@
   },
   "build": {
     "appId": "com.javin23863.godseye",
-    "productName": "GodsEye",
+    "productName": "Godseye",
     "directories": { "output": "release" },
     "files": ["electron/**", "dist/**", "build/icon.ico", "package.json"],
     "asar": true,
@@ -30,10 +30,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "God's Eye"
+      "shortcutName": "Godseye"
     },
     "portable": {
-      "artifactName": "GodsEye-${version}-portable.exe"
+      "artifactName": "Godseye-${version}-portable.exe"
     }
   },
   "dependencies": {},

@@ -56,6 +56,7 @@ import { GlobalInfraLayer, SubmarineCableLayer } from './global-infra'
 import { init as initBrief } from './brief'
 import { init as initAnalyst, type Candidate } from './analyst'
 import { normalizeOpenSky, normalizeAdsbMil } from './flights-normalize.mjs'
+import { installAutomation } from './automation'
 import './style.css'
 
 const ION_TOKEN = import.meta.env.VITE_CESIUM_ION_TOKEN as string | undefined
@@ -758,6 +759,7 @@ const shareOpts = {
   },
 }
 initShare(viewer, shareOpts)
+installAutomation(viewer)
 
 // -- saved boards: named camera+layer views, load / share-link / delete -------
 initBoards({ ...shareOpts, viewer })

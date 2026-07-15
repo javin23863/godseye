@@ -1,4 +1,4 @@
-// God's Eye desktop launcher (Electron) — SELF-CONTAINED to the godseye repo.
+// Godseye desktop launcher (Electron) — SELF-CONTAINED to the godseye repo.
 // Not related to any other program's desktop app.
 //
 // The browser app calls same-origin /feeds/* for feeds that lack CORS or hold a
@@ -294,10 +294,10 @@ function setupTray() {
   if (tray) return
   const img = fs.existsSync(ICON) ? ICON : nativeImage.createEmpty()
   tray = new Tray(img)
-  tray.setToolTip("God's Eye — sentinel watching")
+  tray.setToolTip("Godseye — sentinel watching")
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: "Show God's Eye", click: () => showWindow() },
+      { label: "Show Godseye", click: () => showWindow() },
       { type: 'separator' },
       { label: 'Quit', click: () => { app.isQuitting = true; app.quit() } },
     ]),
@@ -328,7 +328,7 @@ async function createWindow() {
     width: saved?.width ?? 1600,
     height: saved?.height ?? 950,
     backgroundColor: '#000000',
-    title: "GOD'S EYE",
+    title: 'GODSEYE',
     autoHideMenuBar: true,
     show: false, // reveal on ready-to-show to avoid an empty-window flash
     icon: fs.existsSync(ICON) ? ICON : undefined,
