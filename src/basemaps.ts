@@ -53,11 +53,8 @@ function addRemoteLayer(viewer: Viewer, provider: ImageryProvider, index: number
   const layer = new ImageryLayer(provider)
   viewer.imageryLayers.add(layer, index)
   ownLayers.push(layer)
-  let failures = 0
   provider.errorEvent.addEventListener((error) => {
-    failures++
-    error.retry = failures < 3
-    if (failures >= 3) layer.show = false
+    error.retry = error.timesRetried < 2
   })
   return layer
 }
