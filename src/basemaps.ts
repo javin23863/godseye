@@ -3,11 +3,14 @@
 import {
   Cesium3DTileset,
   EllipsoidTerrainProvider,
+  ImageryProvider,
   ImageryLayer,
   OpenStreetMapImageryProvider,
   Terrain,
+  TileMapServiceImageryProvider,
   UrlTemplateImageryProvider,
   Viewer,
+  buildModuleUrl,
   createGooglePhotorealistic3DTileset,
   IonResource,
 } from 'cesium'
@@ -35,6 +38,29 @@ const ROAD = () => new OpenStreetMapImageryProvider({ url: 'https://tile.openstr
 let google3d: Cesium3DTileset | null = null
 let ownLayers: ImageryLayer[] = [] // only remove what we added — overlays (e.g. weather) live in the same collection
 let worldTerrain: Terrain | null = null
+const bundledEarthLayers = new WeakSet<ImageryLayer>()
+const basemapLabelLayers = new WeakSet<ImageryLayer>()
+
+export function isBundledEarthLayer(layer: ImageryLayer): boolean {
+  return bundledEarthLayers.has(layer)
+}
+
+export function isBasemapLabelLayer(layer: ImageryLayer): boolean {
+  return basemapLabelLayers.has(layer)
+}
+
+function addRemoteLayer(viewer: Viewer, provider: ImageryProvider, index: number): ImageryLayer {
+  const layer = new ImageryLayer(provider)
+  viewer.imageryLayers.add(layer, index)
+  ownLayers.push(layer)
+  let failures = 0
+  provider.errorEvent.addEventListener((error) => {
+    failures++
+    error.retry = failures < 3
+    if (failures >= 3) layer.show = false
+  })
+  return layer
+}
 
 /** Real relief under draped imagery; flat ellipsoid under Google 3D (tiles carry their own geometry). */
 function applyTerrain(viewer: Viewer, relief: boolean) {
@@ -73,6 +99,15 @@ export async function setBasemap(viewer: Viewer, mode: BasemapMode): Promise<Bas
   ownLayers = []
   if (google3d) google3d.show = false
 
+  // Always keep a bundled Earth under remote imagery/tiles. It is the fail-closed
+  // Story fallback and prevents network availability from becoming a blank globe.
+  const offline = new ImageryLayer(await TileMapServiceImageryProvider.fromUrl(
+    buildModuleUrl('Assets/Textures/NaturalEarthII'),
+  ))
+  layers.add(offline, 0)
+  ownLayers.push(offline)
+  bundledEarthLayers.add(offline)
+
   if (mode === 'google3d') {
     const tiles = await loadGoogle3d(viewer)
     if (tiles) {
@@ -83,13 +118,9 @@ export async function setBasemap(viewer: Viewer, mode: BasemapMode): Promise<Bas
     mode = 'aerial' // graceful fallback (roadmap risk R1)
   }
   applyTerrain(viewer, true)
-  const base = new ImageryLayer(mode === 'road' ? ROAD() : AERIAL())
-  layers.add(base, 0)
-  ownLayers.push(base)
+  addRemoteLayer(viewer, mode === 'road' ? ROAD() : AERIAL(), 1)
   if (mode === 'aerial') {
-    const lbl = new ImageryLayer(LABELS())
-    layers.add(lbl, 1)
-    ownLayers.push(lbl)
+    basemapLabelLayers.add(addRemoteLayer(viewer, LABELS(), 2))
   }
   return mode
 }

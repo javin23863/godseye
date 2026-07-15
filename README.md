@@ -6,7 +6,9 @@ The upstream inspiration ([bilawalsidhu/gods-eye-view](https://github.com/bilawa
 
 ## Build status
 
-Working app, milestones M0–M5 plus the Hormuz analytics suite ([06-roadmap](docs/06-roadmap.md)):
+Working app, milestones M0–M5, the Hormuz analytics suite, and the final Temporal Evidence Story cutaway ([08-temporal-evidence-story-mode](docs/08-temporal-evidence-story-mode.md)):
+
+- **Temporal Evidence Story mode** — TraderCockpit-ready 6–15 second **Signal → Exposure → Proof** cutaway on the existing Cesium viewer. It isolates one primary event plus at most three explicitly ordered supporting sources, hides Analyst chrome and map-label clutter, waits for rendered/crop-safe/contrast-valid frames, shows one readiness-gated source-lock pulse, preserves all evidence under reduced motion, returns scene-state v2 + evidence-packet/v1, and restores the prior Analyst state after success or failure. `window.godseyeAutomationV1` remains the only supported integration boundary.
 
 - **Globe** — CesiumJS; basemap switch GOOGLE 3D / AERIAL + LBL / ROAD. Runs keyless (Esri/OSM 2D fallback); with a Google Map Tiles key or Cesium ion token the photorealistic 3D tiles are the default.
 - **Live layers** — flights (OpenSky), military (airplanes.live + adsb.lol/adsb.fi mirrors), satellites (CelesTrak TLEs + SGP4, click = orbit track), earthquakes (USGS), boundaries, NEXRAD weather, **AIS ships** (aisstream WebSocket, moving/stationary split, click dossier), **street traffic** (Overpass roads + animated vehicles). 8000-entity cap per aircraft layer; per-layer SOLO isolation.
@@ -22,14 +24,15 @@ Working app, milestones M0–M5 plus the Hormuz analytics suite ([06-roadmap](do
 
 Keys (all free-tier, in gitignored `.env` — copy `.env.example`): `VITE_GOOGLE_TILES_KEY` (3D tiles), `VITE_AISSTREAM_KEY` (ships), `OLLAMA_API_KEY` (AI caption/Q&A, injected server-side by the proxy). None required — the app degrades gracefully without each.
 
-Remaining backlog: worker-thread parsing/clustering (a performance hardening — deferred until the entity load actually janks), true projective-texture CCTV drape onto the 3D tileset (public cams serve no CORS-enabled image to sample), and CCTV PnP auto-calibration (author-marked WIP). See [07-session-notes](docs/07-session-notes.md).
+Godseye v1 capability and visual-language expansion is now frozen. Worker parsing/clustering, SAR, new feeds/viewers/frameworks, archive infrastructure, true projective-texture CCTV drape, and CCTV PnP auto-calibration are M6+ deferred work. Editorial framing, captions, market consequence, audio, publishing, and post-release clip comparisons belong to TraderCockpit. See [08-temporal-evidence-story-mode](docs/08-temporal-evidence-story-mode.md).
 
 ```sh
 npm install
 cp .env.example .env   # optional: add keys
 npm run dev            # http://localhost:5173
-npm test               # 176 pure-logic unit tests
+npm test               # 182 pure-logic unit tests
 npm run build && npm run preview
+npm run verify:story -- http://127.0.0.1:4321  # 3 archetypes × 2 aspects; ffprobe enforces 6-15s and ≥30fps
 node scripts/verify-m0.mjs        # headless smoke: every auto-layer populated + screenshot
 node scripts/verify-styles.mjs    # cycles all six style presets
 node scripts/verify-playback.mjs  # records, scrubs + plays the 4D archive
@@ -52,5 +55,6 @@ Feed proxying: OpenSky, the military mirrors, FRED oil, and the LLM lack third-p
 | [05-improvements](docs/05-improvements.md) | Improvement backlog beyond parity — 25 ranked items |
 | [06-roadmap](docs/06-roadmap.md) | Historical milestone plan plus current backlog and risk register |
 | [07-session-notes](docs/07-session-notes.md) | Evidence log — methodology, per-video notes, verification results, open gaps |
+| [08-temporal-evidence-story-mode](docs/08-temporal-evidence-story-mode.md) | Final Story cutaway contract, visual language, verification receipts, and frozen/deferred boundary |
 
 Scope note: all feeds are public/open data (OSINT visualization). No scraping of private data, no auth bypass.

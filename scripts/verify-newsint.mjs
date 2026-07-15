@@ -17,6 +17,14 @@ const browser = await puppeteer.launch({
 const page = await browser.newPage()
 await page.setViewport({ width: 1400, height: 900 })
 const errors = []
+const clickPanelControl = async (selector) => {
+  await page.evaluate((value) => {
+    const disclosure = document.getElementById('layer-disclosure')
+    if (disclosure) disclosure.open = true
+    document.querySelector(value)?.scrollIntoView({ block: 'center' })
+  }, selector)
+  await page.click(selector)
+}
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
 page.on('response', (r) => {
   if (r.url().includes('/feeds/rssnews') || r.url().includes('/feeds/newsdoc')) console.log('[net]', r.status(), r.url().slice(21, 60))
@@ -48,7 +56,7 @@ const controls = await page.evaluate(() => ({
 for (const [k, v] of Object.entries(controls)) if (!v) errors.push(`missing control: ${k}`)
 
 // live feed: toggle on, wait a fetch cycle, expect rows (or an honest empty state)
-await page.click('#newsfeed-toggle')
+await clickPanelControl('#newsfeed-toggle')
 await new Promise((r) => setTimeout(r, 10_000))
 const feedRows = await page.evaluate(() => document.querySelectorAll('#newsfeed .newsfeed-row').length)
 const feedItems = await page.evaluate(() => document.getElementById('newsfeed')?.dataset.items)
@@ -62,7 +70,7 @@ for (const [btn, row] of [
   ['#outages-scan', 'NET OUTAGES'],
   ['#finstress-scan', 'FIN. STRESS'],
 ]) {
-  await page.click(btn)
+  await clickPanelControl(btn)
   await new Promise((r) => setTimeout(r, 8_000))
   const n = await page.evaluate((label) => {
     const r = [...document.querySelectorAll('#layers label.layer-row')].find((l) => l.textContent?.includes(label))
@@ -74,7 +82,7 @@ for (const [btn, row] of [
 }
 
 // region intel: arm + click globe center -> panel appears with a report body
-await page.click('#intel-arm')
+await clickPanelControl('#intel-arm')
 await page.mouse.click(700, 450)
 await new Promise((r) => setTimeout(r, 26_000)) // covers the module's 20s LLM deadline + fallback render
 const intel = await page.evaluate(() => {

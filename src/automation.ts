@@ -1,5 +1,6 @@
-import { Cartesian3, Cesium3DTileset, Matrix4, Math as CMath, type Viewer } from 'cesium'
+import { Cartesian3, Cesium3DTileset, Matrix4, Math as CMath, type ImageryLayer, type Viewer } from 'cesium'
 import { createAutomationLifecycle, mergeWarnings } from './automation-core.mjs'
+import { isBasemapLabelLayer, isBundledEarthLayer } from './basemaps'
 import { createEvidencePacket } from './evidence-packet.mjs'
 import { captureState } from './scene-state'
 import { SOURCES } from './sources'
@@ -8,6 +9,8 @@ import {
   applyPresentationState,
   captureLayerState,
   focusStoryLayers,
+  lockStoryOverlay,
+  orderedStoryLabels,
   restoreLayerState,
   updateStoryOverlayView,
   type LayerState,
@@ -52,6 +55,8 @@ interface StoryReadiness {
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const STORY_SIGNAL_HOLD_MS = 1_600
+const STORY_LOCK_MS = 800
 
 function visibleTilesets(viewer: Viewer): Cesium3DTileset[] {
   const tilesets: Cesium3DTileset[] = []
@@ -77,8 +82,6 @@ function activeLayers(): { key: string; label: string; registered: boolean }[] {
       }
     })
 }
-
-const activeLayerKeys = () => activeLayers().map(({ key }) => key)
 
 async function invoke(element: HTMLElement): Promise<void> {
   if (element.onclick) await element.onclick.call(element, new PointerEvent('click'))
@@ -124,21 +127,87 @@ export function installAutomation(viewer: Viewer): void {
   let previousPresentation: string | undefined
   let previousCleanUi = false
   let previousLayerState: LayerState[] = []
+  let previousStyle: string | undefined
+  let previousBasemap: string | undefined
+  let previousBloom: boolean | undefined
+  let previousSharpen: string | undefined
+  let previousPixelate: string | undefined
+  let previousResolutionScale: number | undefined
+  let previousGlobeScreenSpaceError: number | undefined
+  let previousGlobeLighting: boolean | undefined
+  let previousScreenSpaceErrors: { primitive: { maximumScreenSpaceError: number }; value: number }[] = []
+  let previousImageryShows: { layer: ImageryLayer; show: boolean }[] = []
+  let previousManualOrbit = false
+  let storyPreferredLabels: string[] = []
   let recordingObservedAt: string | undefined
   let storySourceLabels: string[] = []
   let storyContextText = ''
-  let compositeFrame: number | null = null
+  let storyLockStartedAt: number | null = null
+  let compositeTimer: number | null = null
+  let recordingStream: MediaStream | null = null
   const compositeCanvas = document.createElement('canvas')
   const compositeContext = compositeCanvas.getContext('2d')
 
-  const restorePresentation = () => {
+  const applyStyle = async (name: string) => {
+    const button = [...document.querySelectorAll<HTMLButtonElement>('#style-presets button')]
+      .find((candidate) => candidate.textContent === name)
+    if (!button) throw new Error(`unknown style: ${name}`)
+    if (!button.classList.contains('active')) await invoke(button)
+  }
+
+  const setEffectValue = (id: string, value: string) => {
+    const input = document.getElementById(id) as HTMLInputElement | null
+    if (!input || input.value === value) return
+    input.value = value
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+
+  const orderedActiveLayers = () => {
+    const active = activeLayers()
+    if (storyPreferredLabels.length === 0) return active
+    const labels = orderedStoryLabels(active.map(({ label }) => label), storyPreferredLabels)
+    return labels.map((label) => active.find((layer) => layer.label === label)!).filter(Boolean)
+  }
+
+  const restorePresentation = async () => {
+    if (previousStyle) await applyStyle(previousStyle)
+    if (previousBasemap) {
+      const button = document.querySelector<HTMLButtonElement>(`#basemaps button[data-mode="${CSS.escape(previousBasemap)}"]`)
+      if (button && !button.classList.contains('active')) await invoke(button)
+    }
+    const bloom = document.getElementById('fx-bloom') as HTMLInputElement | null
+    if (bloom && previousBloom !== undefined && bloom.checked !== previousBloom) bloom.click()
+    if (previousSharpen !== undefined) setEffectValue('fx-sharpen', previousSharpen)
+    if (previousPixelate !== undefined) setEffectValue('fx-pixelate', previousPixelate)
+    if (previousResolutionScale !== undefined) viewer.resolutionScale = previousResolutionScale
+    if (previousGlobeScreenSpaceError !== undefined) viewer.scene.globe.maximumScreenSpaceError = previousGlobeScreenSpaceError
+    if (previousGlobeLighting !== undefined) viewer.scene.globe.enableLighting = previousGlobeLighting
+    for (const { primitive, value } of previousScreenSpaceErrors) primitive.maximumScreenSpaceError = value
+    for (const { layer, show } of previousImageryShows) {
+      if (viewer.imageryLayers.contains(layer)) layer.show = show
+    }
     applyPresentationState(previousPresentation, previousCleanUi)
     restoreLayerState(previousLayerState)
+    const orbitButton = document.getElementById('orbit-toggle') as HTMLButtonElement | null
+    if (previousManualOrbit && orbitButton && !orbitButton.classList.contains('active')) await invoke(orbitButton)
     previousLayerState = []
+    previousStyle = undefined
+    previousBasemap = undefined
+    previousBloom = undefined
+    previousSharpen = undefined
+    previousPixelate = undefined
+    previousResolutionScale = undefined
+    previousGlobeScreenSpaceError = undefined
+    previousGlobeLighting = undefined
+    previousScreenSpaceErrors = []
+    previousImageryShows = []
+    previousManualOrbit = false
+    storyPreferredLabels = []
+    storyLockStartedAt = null
   }
 
   const updateStoryOverlay = (observedAt = new Date().toISOString()) => {
-    const registered = activeLayers().filter((layer) => layer.registered)
+    const registered = orderedActiveLayers().filter((layer) => layer.registered)
     storySourceLabels = registered.slice(0, 4).map(({ label }) => label)
     storyContextText = registered.length
       ? `${registered.length} REGISTERED SOURCE${registered.length === 1 ? '' : 'S'} · LIVE SCENE`
@@ -147,11 +216,11 @@ export function installAutomation(viewer: Viewer): void {
   }
 
   const stopComposite = () => {
-    if (compositeFrame !== null) cancelAnimationFrame(compositeFrame)
-    compositeFrame = null
+    if (compositeTimer !== null) window.clearInterval(compositeTimer)
+    compositeTimer = null
   }
 
-  const drawComposite = (scheduleNext = false) => {
+  const drawComposite = () => {
     if (!compositeContext) return
     const width = canvas.width
     const height = canvas.height
@@ -171,6 +240,21 @@ export function installAutomation(viewer: Viewer): void {
     shade.addColorStop(1, 'rgba(2,7,12,.74)')
     compositeContext.fillStyle = shade
     compositeContext.fillRect(0, 0, width, height)
+
+    let lockProgress = 1
+    if (storyLockStartedAt !== null) {
+      const lockElapsed = performance.now() - storyLockStartedAt - STORY_SIGNAL_HOLD_MS
+      lockProgress = Math.max(0, Math.min(1, lockElapsed / STORY_LOCK_MS))
+      if (lockElapsed >= 0 && lockProgress < 1) {
+        const pulse = Math.sin(Math.PI * lockProgress)
+        const inset = Math.round(Math.min(width, height) * (0.08 - 0.025 * lockProgress))
+        compositeContext.strokeStyle = `rgba(107,211,214,${(0.55 * pulse).toFixed(3)})`
+        compositeContext.lineWidth = Math.max(1, 2 * scale)
+        compositeContext.strokeRect(inset, inset, width - inset * 2, height - inset * 2)
+      } else if (lockProgress >= 1) {
+        storyLockStartedAt = null
+      }
+    }
 
     compositeContext.textBaseline = 'top'
     compositeContext.fillStyle = '#ffc269'
@@ -197,44 +281,50 @@ export function installAutomation(viewer: Viewer): void {
     compositeContext.font = `400 ${Math.round(10 * scale)}px "Segoe UI", sans-serif`
     compositeContext.fillText('ACTIVE SOURCES', safe.right, safe.bottom - 28 * scale)
     compositeContext.fillStyle = '#f5f1e8'
-    compositeContext.fillText(storySourceLabels.join('  ·  '), safe.right, safe.bottom)
+    const visibleSources = lockProgress < 1
+      ? storySourceLabels.slice(0, Math.max(1, Math.ceil(lockProgress * storySourceLabels.length)))
+      : storySourceLabels
+    compositeContext.fillText(visibleSources.join('  ·  '), safe.right, safe.bottom)
     compositeContext.textAlign = 'left'
-    if (scheduleNext) compositeFrame = requestAnimationFrame(() => drawComposite(true))
   }
 
-  const inspectFrameContrast = (surface: HTMLCanvasElement = canvas): ReadinessCheck => {
-    const sample = document.createElement('canvas')
-    sample.width = 12
-    sample.height = 8
-    const context = sample.getContext('2d', { willReadFrequently: true })
-    if (!context) return { level: 'fail', detail: 'frame sampling is unavailable' }
+  const inspectFrameContrast = (): ReadinessCheck => {
     try {
-      context.drawImage(surface, 0, 0, sample.width, sample.height)
-      const pixels = context.getImageData(0, 0, sample.width, sample.height).data
+      const context = (viewer.scene as unknown as { context: {
+        drawingBufferWidth: number
+        drawingBufferHeight: number
+        readPixels(options: { x: number; y: number; width: number; height: number }): ArrayLike<number>
+      } }).context
       const values: number[] = []
-      let dark = 0
-      let bright = 0
-      for (let i = 0; i < pixels.length; i += 4) {
-        const value = 0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2]
-        values.push(value)
-        if (value < 12) dark++
-        if (value > 244) bright++
+      for (let row = 0; row < 4; row++) {
+        for (let column = 0; column < 6; column++) {
+          const pixels = context.readPixels({
+            x: Math.floor((column + 0.5) * context.drawingBufferWidth / 6),
+            y: Math.floor((row + 0.5) * context.drawingBufferHeight / 4),
+            width: 1,
+            height: 1,
+          })
+          values.push(0.2126 * pixels[0] + 0.7152 * pixels[1] + 0.0722 * pixels[2])
+        }
       }
+      const dark = values.filter((value) => value < 12).length
+      const bright = values.filter((value) => value > 244).length
       const mean = values.reduce((sum, value) => sum + value, 0) / values.length
       const spread = Math.sqrt(values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length)
-      if (dark / values.length > 0.94) return { level: 'fail', detail: 'frame is nearly black' }
-      if (bright / values.length > 0.88) return { level: 'fail', detail: 'frame is overexposed' }
-      if (spread < 4) return { level: 'fail', detail: 'frame has insufficient visual contrast' }
+      if (dark / values.length > 0.94) return { level: 'fail', detail: `frame is nearly black (mean ${mean.toFixed(1)})` }
+      if (bright / values.length > 0.88) return { level: 'fail', detail: `frame is overexposed (mean ${mean.toFixed(1)})` }
+      if (spread < 4) return { level: 'fail', detail: `frame has insufficient visual contrast (spread ${spread.toFixed(1)})` }
       return { level: 'pass', detail: `luminance spread ${spread.toFixed(1)}` }
     } catch {
-      return { level: 'fail', detail: 'cross-origin imagery prevented contrast sampling' }
+      return { level: 'fail', detail: 'framebuffer sampling is unavailable' }
     }
   }
 
-  const inspectStoryReadiness = (): StoryReadiness => {
+  const inspectStoryReadiness = (allowRenderedCoverage = false): StoryReadiness => {
     viewer.scene.render()
-    drawComposite(false)
-    const active = activeLayers()
+    const contrast = inspectFrameContrast()
+    drawComposite()
+    const active = orderedActiveLayers()
     const registered = active.filter((layer) => layer.registered)
     const unregistered = active.filter((layer) => !layer.registered)
     const safe = storySafeBounds(innerWidth, innerHeight)
@@ -252,7 +342,18 @@ export function installAutomation(viewer: Viewer): void {
       camera: cameraHeight > 100 && globeVisible
         ? { level: 'pass' as const, detail: `globe visible at ${Math.round(cameraHeight)}m` }
         : { level: 'fail' as const, detail: 'camera is below a safe range or the globe is not visible' },
-      tiles: summarizeStoryTiles(viewer.scene.globe.tilesLoaded, visibleTilesets(viewer)),
+      tiles: summarizeStoryTiles(
+        viewer.scene.globe.tilesLoaded,
+        visibleTilesets(viewer),
+        allowRenderedCoverage && (() => {
+          // Cesium's public flag includes medium/low refinement. After the strict
+          // wait, require rendered coverage and an empty high-priority queue.
+          const surface = (viewer.scene.globe as unknown as {
+            _surface?: { _tilesToRender: unknown[]; _tileLoadQueueHigh: unknown[] }
+          })._surface
+          return Boolean(surface?._tilesToRender.length && surface._tileLoadQueueHigh.length === 0)
+        })(),
+      ),
       sources: !registered.length
         ? { level: 'fail' as const, detail: 'no active registered source' }
         : unregistered.length
@@ -261,7 +362,7 @@ export function installAutomation(viewer: Viewer): void {
       overlays: overlayFits
         ? { level: 'pass' as const, detail: 'Story evidence elements fit the responsive safe frame above the caption reserve' }
         : { level: 'fail' as const, detail: 'Story evidence element is hidden, clipped, or inside the caption reserve' },
-      contrast: inspectFrameContrast(canvas),
+      contrast,
     }
     return summarizeStoryReadiness(checks) as StoryReadiness
   }
@@ -271,14 +372,26 @@ export function installAutomation(viewer: Viewer): void {
     if (presentation === 'story') {
       if (!compositeContext) throw new Error('Story capture composition is unavailable in this browser')
       stopComposite()
-      drawComposite(true)
+      drawComposite()
     }
     if (typeof surface.captureStream !== 'function' || typeof MediaRecorder === 'undefined') {
       throw new Error('canvas recording is unavailable in this browser')
     }
     chunks = []
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm'
-    recorder = new MediaRecorder(surface.captureStream(30), { mimeType, videoBitsPerSecond: 12_000_000 })
+    recordingStream = surface.captureStream(presentation === 'story' ? 0 : 30)
+    if (presentation === 'story') {
+      const track = recordingStream.getVideoTracks()[0] as MediaStreamTrack & { requestFrame?: () => void }
+      if (typeof track?.requestFrame !== 'function') throw new Error('manual Story frame capture is unavailable in this browser')
+      const renderFrame = () => {
+        drawComposite()
+        track.requestFrame?.()
+      }
+      renderFrame()
+      // Small scheduling margin keeps measured output at or above 30 fps.
+      compositeTimer = window.setInterval(renderFrame, 1000 / 32)
+    }
+    recorder = new MediaRecorder(recordingStream, { mimeType, videoBitsPerSecond: 12_000_000 })
     recorder.ondataavailable = (event) => event.data.size && chunks.push(event.data)
     stopped = new Promise((resolve) => { recorder!.onstop = () => resolve() })
     recorder.start(1000)
@@ -313,12 +426,14 @@ export function installAutomation(viewer: Viewer): void {
 
   const applySafeCamera = (camera: CameraRequest): number => {
     stopOrbit?.()
-    const height = Math.min(2_500_000, Math.max(250_000, camera.height * 2.5))
+    // A fallback is an evidence overview, not a terrain close-up. Staying above
+    // 2,500 km keeps the primary region legible and avoids accepting half-loaded detail.
+    const height = Math.min(8_000_000, Math.max(2_500_000, camera.height * 2.5))
     viewer.camera.setView({
       destination: Cartesian3.fromDegrees(camera.lon, camera.lat, height),
       orientation: {
         heading: CMath.toRadians(camera.headingDeg ?? 0),
-        pitch: CMath.toRadians(-45),
+        pitch: CMath.toRadians(camera.pitchDeg ?? -55),
         roll: 0,
       },
     })
@@ -359,32 +474,70 @@ export function installAutomation(viewer: Viewer): void {
       previousPresentation = document.body.dataset.presentation
       previousCleanUi = document.body.classList.contains('clean-ui')
       previousLayerState = presentation === 'story' ? captureLayerState() : []
+      previousStyle = presentation === 'story' ? document.getElementById('style-name')?.textContent?.trim() : undefined
+      previousBasemap = presentation === 'story'
+        ? document.querySelector<HTMLButtonElement>('#basemaps button.active')?.dataset.mode
+        : undefined
+      const bloom = document.getElementById('fx-bloom') as HTMLInputElement | null
+      previousBloom = presentation === 'story' ? bloom?.checked : undefined
+      previousSharpen = presentation === 'story'
+        ? (document.getElementById('fx-sharpen') as HTMLInputElement | null)?.value
+        : undefined
+      previousPixelate = presentation === 'story'
+        ? (document.getElementById('fx-pixelate') as HTMLInputElement | null)?.value
+        : undefined
+      previousResolutionScale = presentation === 'story' ? viewer.resolutionScale : undefined
+      previousGlobeScreenSpaceError = presentation === 'story' ? viewer.scene.globe.maximumScreenSpaceError : undefined
+      previousGlobeLighting = presentation === 'story' ? viewer.scene.globe.enableLighting : undefined
+      previousScreenSpaceErrors = []
+      previousImageryShows = []
+      if (presentation === 'story') {
+        for (let i = 0; i < viewer.imageryLayers.length; i++) {
+          const layer = viewer.imageryLayers.get(i)
+          previousImageryShows.push({ layer, show: layer.show })
+        }
+        for (let i = 0; i < viewer.scene.primitives.length; i++) {
+          const primitive = viewer.scene.primitives.get(i) as { maximumScreenSpaceError?: number }
+          if (typeof primitive?.maximumScreenSpaceError === 'number') {
+            previousScreenSpaceErrors.push({ primitive: primitive as { maximumScreenSpaceError: number }, value: primitive.maximumScreenSpaceError })
+          }
+        }
+      }
       readinessWarnings = []
       focusWarnings = []
+      storyPreferredLabels = []
+      storyLockStartedAt = null
       recordingObservedAt = undefined
       applyPresentationState(presentation, previousCleanUi)
       try {
         if (presentation === 'story') {
+          viewer.scene.globe.enableLighting = false
+          for (let i = 0; i < viewer.imageryLayers.length; i++) {
+            const layer = viewer.imageryLayers.get(i)
+            if (isBasemapLabelLayer(layer)) layer.show = false
+          }
           const orbitButton = document.getElementById('orbit-toggle')
-          if (orbitButton?.classList.contains('active')) await invoke(orbitButton)
+          previousManualOrbit = Boolean(orbitButton?.classList.contains('active'))
+          if (previousManualOrbit && orbitButton) await invoke(orbitButton)
+          if (bloom && !bloom.checked) bloom.click()
+          setEffectValue('fx-sharpen', '0')
+          setEffectValue('fx-pixelate', '0')
         }
         const legacyOrbitCount = [...(request.actions ?? []), ...(request.afterActions ?? [])]
           .filter((token) => token === 'orbit-toggle').length
         if (request.quality) {
           viewer.resolutionScale = request.quality.resolutionScale
+          viewer.scene.globe.maximumScreenSpaceError = request.quality.maximumScreenSpaceError
           for (let i = 0; i < viewer.scene.primitives.length; i++) {
             const primitive = viewer.scene.primitives.get(i) as { maximumScreenSpaceError?: number }
             if (primitive?.maximumScreenSpaceError !== undefined) {
               primitive.maximumScreenSpaceError = request.quality.maximumScreenSpaceError
             }
           }
+        } else if (presentation === 'story') {
+          viewer.scene.globe.maximumScreenSpaceError = 8
         }
-        if (request.style) {
-          const button = [...document.querySelectorAll<HTMLButtonElement>('#style-presets button')]
-            .find((candidate) => candidate.textContent === request.style)
-          if (!button) throw new Error(`unknown style: ${request.style}`)
-          await invoke(button)
-        }
+        if (request.style || presentation === 'story') await applyStyle(request.style ?? 'DUSK')
         for (const token of request.actions ?? []) {
           if (presentation === 'story' && token === 'orbit-toggle') continue
           await applyAction(token)
@@ -416,22 +569,57 @@ export function installAutomation(viewer: Viewer): void {
             const explicitLabels = [...(request.actions ?? []), ...(request.afterActions ?? [])]
               .filter((token) => token.startsWith('layer:') && !token.endsWith(':off'))
               .map((token) => token.slice(6))
-            const registeredLabels = activeLayers().filter((layer) => layer.registered).map((layer) => layer.label)
-            const hiddenLayers = focusStoryLayers([...explicitLabels, ...registeredLabels])
+            const hiddenLayers = focusStoryLayers(explicitLabels)
+            storyPreferredLabels = orderedStoryLabels(activeLayers().map(({ label }) => label), explicitLabels)
             if (hiddenLayers) focusWarnings.push(`Story focus hid ${hiddenLayers} extra active layer${hiddenLayers === 1 ? '' : 's'}`)
             recordingObservedAt = new Date().toISOString()
             updateStoryOverlay(recordingObservedAt)
             readiness = inspectStoryReadiness()
+            let fallbackWarning: string | undefined
             if (flightFallbackHeight !== undefined) {
-              readiness.fallbackApplied = true
-              readiness.warnings.unshift(`safe camera fallback applied at ${Math.round(flightFallbackHeight)}m`)
-            } else if (!readiness.ready && needsStoryFallback(readiness)) {
+              fallbackWarning = `safe camera fallback applied at ${Math.round(flightFallbackHeight)}m`
+            } else if (!readiness.ready && (
+              readiness.checks.camera === 'fail' ||
+              (readiness.checks.contrast === 'fail' && readiness.checks.tiles !== 'fail')
+            )) {
               const fallbackHeight = applySafeCamera(request.camera)
               await wait(2_000)
               updateStoryOverlay()
               readiness = inspectStoryReadiness()
+              fallbackWarning = `safe camera fallback applied at ${Math.round(fallbackHeight)}m`
+            }
+            const tilesBlocking = () => readiness!.checks.tiles === 'fail' && Object.entries(readiness!.checks)
+              .every(([name, level]) => level !== 'fail' || name === 'tiles' || name === 'contrast')
+            const tileDeadline = performance.now() + 6_000
+            while (tilesBlocking() && performance.now() < tileDeadline) {
+              await wait(500)
+              updateStoryOverlay()
+              readiness = inspectStoryReadiness()
+            }
+            if (tilesBlocking()) {
+              for (let i = 0; i < viewer.imageryLayers.length; i++) {
+                const layer = viewer.imageryLayers.get(i)
+                layer.show = isBundledEarthLayer(layer)
+              }
+              const offlineDeadline = performance.now() + 6_000
+              while (tilesBlocking() && performance.now() < offlineDeadline) {
+                await wait(500)
+                updateStoryOverlay()
+                readiness = inspectStoryReadiness()
+              }
+              if (tilesBlocking()) readiness = inspectStoryReadiness(true)
+              if (readiness.ready) fallbackWarning ??= 'bundled Earth fallback applied after remote imagery timeout'
+            }
+            if (!readiness.ready && !fallbackWarning && needsStoryFallback(readiness) && readiness.checks.tiles !== 'fail') {
+              const fallbackHeight = applySafeCamera(request.camera)
+              await wait(2_000)
+              updateStoryOverlay()
+              readiness = inspectStoryReadiness(true)
+              fallbackWarning = `safe camera fallback applied at ${Math.round(fallbackHeight)}m`
+            }
+            if (fallbackWarning) {
               readiness.fallbackApplied = true
-              readiness.warnings.unshift(`safe camera fallback applied at ${Math.round(fallbackHeight)}m`)
+              readiness.warnings.unshift(fallbackWarning)
             }
             if (!readiness.ready) {
               throw new Error(`Story frame is not capture-ready: ${readiness.warnings.join('; ')}`)
@@ -439,6 +627,8 @@ export function installAutomation(viewer: Viewer): void {
             readinessWarnings = [...focusWarnings, ...readiness.warnings]
             recordingObservedAt = new Date().toISOString()
             updateStoryOverlay(recordingObservedAt)
+            lockStoryOverlay()
+            if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) storyLockStartedAt = performance.now()
           }
           if (presentation !== 'story') startOrbit(request.camera, request.orbitDegPerSec)
           startRecorder(presentation)
@@ -459,9 +649,11 @@ export function installAutomation(viewer: Viewer): void {
         }
         recorder = null
         stopped = null
+        recordingStream?.getTracks().forEach((track) => track.stop())
+        recordingStream = null
         chunks = []
         stopComposite()
-        restorePresentation()
+        await restorePresentation()
         throw error
       }
     },
@@ -470,9 +662,11 @@ export function installAutomation(viewer: Viewer): void {
       recorder!.stop()
       await stopped
       stopComposite()
+      recordingStream?.getTracks().forEach((track) => track.stop())
+      recordingStream = null
       const scene = captureState(viewer, {
         observedAt: recordingObservedAt,
-        layers: activeLayerKeys(),
+        layers: orderedActiveLayers().map(({ key }) => key),
         style: document.getElementById('style-name')?.textContent?.trim() || undefined,
         basemap: document.querySelector<HTMLButtonElement>('#basemaps button.active')?.dataset.mode,
       })
@@ -491,8 +685,10 @@ export function installAutomation(viewer: Viewer): void {
       if (!blob) {
         recorder = null
         stopped = null
+        recordingStream?.getTracks().forEach((track) => track.stop())
+        recordingStream = null
         recordingObservedAt = undefined
-        restorePresentation()
+        await restorePresentation()
         return null
       }
       return await new Promise<string>((resolve, reject) => {

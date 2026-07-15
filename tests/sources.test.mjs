@@ -44,3 +44,12 @@ test('describeSources skips unknown keys', () => {
   assert.deepEqual(describeSources(['nope', 'flights', 'ghost']).map((b) => b.label), ['FLIGHTS'])
   assert.deepEqual(describeSources([]), [])
 })
+
+test('all three Story proof archetypes have registered provenance', () => {
+  const archetypes = [
+    ['ships', 'gate', 'darkvessel', 'infra'],
+    ['fires', 'alerts', 'outages', 'ginfra'],
+    ['military', 'gpsjam', 'aoi', 'zones'],
+  ]
+  for (const keys of archetypes) assert.deepEqual(keys.filter((key) => !sourceFor(key)), [])
+})

@@ -72,6 +72,9 @@ const viewer = new Viewer('cesiumContainer', {
   sceneModePicker: false,
   navigationHelpButton: false,
   baseLayer: false,
+  // Story capture composites the rendered globe with evidence typography.
+  // Preserve the completed frame so the 2D capture canvas receives real pixels.
+  contextOptions: { webgl: { preserveDrawingBuffer: true } },
   shadows: true, // sun shadows on 3D tiles/entities, sun tracks the 4D clock
 })
 viewer.scene.globe.baseColor = viewer.scene.backgroundColor
@@ -206,16 +209,16 @@ void (async () => {
 const status = document.getElementById('status')!
 let setShipCount: (n: number) => void = () => {}
 const ships = new ShipLayer(viewer, (n) => setShipCount(n))
-if (ships.enabled) {
-  setShipCount = addLayerRow('SHIPS', ships, { onDemand: true }) // WebSocket stream fills over ~60s
-  setShipCount(0)
-  const subBtn = document.createElement('button')
-  subBtn.id = 'ships-sub'
-  subBtn.textContent = '└ SUBSCRIBE VIEW'
-  document.getElementById('layers')!.appendChild(subBtn)
-  subBtn.onclick = () => (status.textContent = ships.subscribeView())
-  ships.start()
-}
+// Keep the evidence layer addressable without a live key; unavailable data stays an
+// honest zero-count source instead of making deterministic Story composition impossible.
+setShipCount = addLayerRow('SHIPS', ships, { onDemand: true }) // WebSocket stream fills over ~60s when configured
+setShipCount(0)
+const subBtn = document.createElement('button')
+subBtn.id = 'ships-sub'
+subBtn.textContent = '└ SUBSCRIBE VIEW'
+document.getElementById('layers')!.appendChild(subBtn)
+subBtn.onclick = () => (status.textContent = ships.subscribeView())
+ships.start()
 
 // -- dark-vessel detection (CAP-14): AIS-gap analysis over recorded ship history ----------
 const darkListEl = document.createElement('div')

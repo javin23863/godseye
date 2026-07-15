@@ -1,6 +1,6 @@
 # 08 — Temporal Evidence and Story Mode
 
-- **Status:** Accepted design and implementation baseline; repository state is not a production-deployment guarantee
+- **Status:** Implemented and browser-verified closeout; v1 contract and visual language frozen
 - **Owner:** javin23863
 - **Repository:** `javin23863/godseye`
 - **Last updated:** 2026-07-15
@@ -12,7 +12,7 @@
 
 Godseye is an independent real-time geospatial evidence and storytelling application. “God's Eye View” refers only to the attributed upstream inspiration documented in `00-overview.md`; the project name is **Godseye**.
 
-Docs 00–07 preserve the reconstruction evidence and original parity roadmap. This accepted design baseline governs the next visual direction: make time, source provenance, and uncertainty visible instead of adding more generic tactical decoration.
+Docs 00–07 preserve the reconstruction evidence and original parity roadmap. This closeout governs the final Godseye v1 direction: make time, source provenance, and uncertainty visible instead of adding more generic tactical decoration. Godseye is now a 6–15 second evidence cutaway inside the wider TraderCockpit editorial experience; Analyst mode remains the maximal command center.
 
 Godseye does not adopt Apollo's organic intelligence identity. TraderCockpit may use Godseye footage and versioned evidence packets, but the repositories, installations, interfaces, and brands remain separate.
 
@@ -90,15 +90,13 @@ Story evidence chrome may use a restrained proportional sans face for legibility
 
 ## Story choreography
 
-TraderCockpit continues to own shot timing. Godseye supplies five semantic visual phases that existing shot lists can compose with action tokens:
+TraderCockpit owns story selection, captions, market interpretation, audio, editing, and publishing. Godseye implements the **Signal → Exposure → Proof** cutaway through the existing `begin → finish → drain` lifecycle:
 
-1. **Context:** establish the location and scale.
-2. **Reveal:** introduce the primary observed signal and source.
-3. **Focus:** approach the event while suppressing unrelated layers.
-4. **Compare:** show real temporal change or supporting signals when available.
-5. **Resolve:** hold a readable scene for the evidence summary and edit transition.
+1. **Signal / Context — 1.5–3s:** settle the camera, show the primary observation and its first registered source, and suppress inherited Analyst clutter.
+2. **Exposure / Reveal — 3–7s:** after readiness passes, run one 800ms source-lock pulse and reveal no more than three supporting sources in the explicit action order.
+3. **Proof / Resolve — 2–5s:** hold the observation time, freshness/provenance, and stable evidence frame for at least 1.5s. Show recorded change only when history exists; otherwise show freshness instead of fabricating a rewind.
 
-The camera moves because the narrative scale changes, not simply to keep the globe moving. Orbit is restrained during evidence reading and stops before final capture if it harms label stability.
+The implemented default holds Signal for 1.6s, runs the sub-second reveal, and leaves the remaining 6–15 second clip stable for Proof. Reduced motion removes the pulse and snaps directly to the complete evidence state. The camera moves because narrative scale changes, not merely to keep the globe moving.
 
 ## One dual-safe composition
 
@@ -163,12 +161,12 @@ After actions, camera movement, and settling, Story mode evaluates the frame bef
 Checks use `pass`, `warn`, or `fail` so warnings remain distinguishable from blocking errors.
 
 - **Camera:** target coordinates are valid, the camera is above the ellipsoid/terrain, and the globe occupies a usable part of the frame.
-- **Tiles:** the scene has rendered and globe/tiles are ready within the settle window.
+- **Tiles:** the scene has rendered and globe/tiles are ready within the settle window. Remote imagery receives a bounded wait, then the bundled Natural Earth layer is used. After the strict wait, rendered coverage with no high-priority gaps may proceed as an explicit refinement warning; an unrendered frame still fails.
 - **Sources:** at least one active Story signal maps to the registered source catalog; unregistered active layers warn.
 - **Overlays:** required Story elements are visible and inside the current viewport's safe areas.
-- **Contrast:** a downscaled sample from the recording canvas is neither effectively blank nor dominated by clipped luminance.
+- **Contrast:** a sparse sample of the rendered Cesium framebuffer is neither effectively blank nor dominated by clipped luminance.
 
-On camera or contrast failure, apply one deterministic fallback: preserve longitude/latitude and heading, use pitch `-45`, stop orbit, and raise the camera to a safe contextual height. Re-render and run the checks once more. Record `fallbackApplied: true` and the reason as a warning.
+On camera or contrast failure, apply one deterministic fallback: preserve longitude/latitude, heading, and the requested pitch, stop orbit, and raise the camera to a safe contextual height between 2,500km and 8,000km. Re-render and run the checks again. Record `fallbackApplied: true` and the reason as a warning.
 
 If the fallback still fails a blocking check, reject `begin` before MediaRecorder starts. The lifecycle remains idle.
 
@@ -189,20 +187,41 @@ Readiness and fallback warnings are merged with caller warnings into `evidence-p
 
 No change. Return the next base64 chunk or `null`; the lifecycle returns to idle after the terminal `null`.
 
-## Delivery order
+## Implemented closeout
 
-1. Record the merged contract and automation baseline from Godseye PR #1 at `f292d883de43d893ea7381c481e8e334fcac6400` on `main`.
-2. Preserve the accepted policy/plan baseline from PR #2 at `f4b85e2db1a72f10a705fc1dc23b3f5f54d620ef`; Story implementation remains a separate follow-on change.
-3. Add `presentation` validation and additive status/begin response fields with focused tests.
-4. Build the minimal Story chrome and dual-safe CSS on the existing viewer.
-5. Add readiness checks and one deterministic fallback.
-6. Prototype Context → Reveal → Focus → Compare → Resolve with three representative real events.
-7. Connect TraderCockpit's existing shot lists through semantic actions only.
-8. Simplify Analyst mode after Story capture is stable.
+- `window.godseyeAutomationV1` remains the sole caller boundary; omitted `presentation` remains Analyst-compatible.
+- Story uses DUSK Earth imagery, restrained bloom, no Analyst chrome, no optional basemap-label clutter, one primary layer, and at most three supports.
+- Explicit semantic action order defines primary/support source order in the overlay, scene-state v2, and evidence-packet/v1.
+- Story snapshots and restores presentation, clean UI, layers, style, basemap imagery visibility, bloom, sharpen, pixelate, resolution, globe/tileset quality, globe lighting, and manual orbit on success, begin failure, evidence failure/cancellation, and terminal drain.
+- Every layer used by the three proof archetypes has registered provenance. Missing history remains a freshness warning; no rewind is synthesized.
+- The Story composite uses a preserved WebGL frame plus a manual 32Hz canvas-track loop, producing measured output above 30fps without changing the public schema.
+- Keyless SHIPS remains an honest zero-count, addressable evidence layer. Bundled Natural Earth prevents remote imagery failure from becoming a blank capture.
+- No feed, viewer, rendering framework, archive, SAR path, worker parser, CCTV completion, or briefing schema was added.
 
-No new rendering framework or duplicate viewer is introduced. A direct `deploy` instruction invokes the Luna workflow in `AGENTS.md`; the primary agent remains responsible for implementation and approval.
+All M6+ capability expansion is explicitly deferred. Further editorial, market, caption, audio, distribution, and performance-comparison work belongs in TraderCockpit or post-release measurement—not in Godseye v1.
 
 ## Verification
+
+### Closeout commands
+
+```sh
+npm test
+npm run build
+npm run verify:story -- http://127.0.0.1:4321
+node scripts/verify-newsint.mjs http://127.0.0.1:4321
+node scripts/verify-visuals.mjs http://127.0.0.1:4321
+```
+
+Verified on 2026-07-15 against local Vite/Edge:
+
+- `npm test`: **182/182 pass**.
+- `npm run build`: TypeScript and Vite production build pass.
+- `verify:story`: **3 archetypes × 2 aspects pass**, including invalid-frame rejection, camera fallback, cancellation/completion restoration, source/order agreement, crop safety, reduced motion, no Analyst chrome, and no page errors.
+- Official landscape WebM receipts: geopolitical **6.160s / 199 frames / 32.17fps**; natural disaster **6.180s / 199 frames / 32.04fps**; airspace/security **6.180s / 197 frames / 31.73fps**.
+- `verify-newsint`: pass with 16 zones, 38 feed rows, 1,500 fire detections, 40 weather alerts, 4 outage signals, 5 financial instruments, and a 45-character grounded/fallback region report.
+- `verify-visuals` passed on 2026-07-15 with `rings=27`, `trails=73`, and `VISUALS VERIFY OK`; screenshots are in `artifacts/story-closeout-20260715`.
+
+Generated local artifacts and the machine-readable `godseye-story-verification/v1` receipt are in `artifacts/story-closeout-20260715/` (gitignored). The set contains three official 1920×1080 clips, one Signal/Exposure/Proof still per archetype, one 1080×1920 reduced-motion proof still per archetype, and the news regression screenshot.
 
 ### Contract tests
 
