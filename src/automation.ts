@@ -364,6 +364,12 @@ export function installAutomation(viewer: Viewer): void {
       recordingObservedAt = undefined
       applyPresentationState(presentation, previousCleanUi)
       try {
+        if (presentation === 'story') {
+          const orbitButton = document.getElementById('orbit-toggle')
+          if (orbitButton?.classList.contains('active')) await invoke(orbitButton)
+        }
+        const legacyOrbitCount = [...(request.actions ?? []), ...(request.afterActions ?? [])]
+          .filter((token) => token === 'orbit-toggle').length
         if (request.quality) {
           viewer.resolutionScale = request.quality.resolutionScale
           for (let i = 0; i < viewer.scene.primitives.length; i++) {
@@ -379,7 +385,10 @@ export function installAutomation(viewer: Viewer): void {
           if (!button) throw new Error(`unknown style: ${request.style}`)
           await invoke(button)
         }
-        for (const token of request.actions ?? []) await applyAction(token)
+        for (const token of request.actions ?? []) {
+          if (presentation === 'story' && token === 'orbit-toggle') continue
+          await applyAction(token)
+        }
 
         if (presentation === 'analyst' && request.camera.fromHeight) {
           viewer.camera.setView({ destination: Cartesian3.fromDegrees(request.camera.lon, request.camera.lat, request.camera.fromHeight) })
@@ -397,7 +406,10 @@ export function installAutomation(viewer: Viewer): void {
             focusWarnings.push(`safe camera fallback applied after ${error instanceof Error ? error.message : 'camera flight failed'}`)
           }
           await wait((request.settleSec ?? 4) * 1000)
-          for (const token of request.afterActions ?? []) await applyAction(token)
+          for (const token of request.afterActions ?? []) {
+            if (presentation === 'story' && token === 'orbit-toggle') continue
+            await applyAction(token)
+          }
           if (request.afterActions?.length) await wait((request.actionWaitSec ?? 5) * 1000)
           let readiness: StoryReadiness | undefined
           if (presentation === 'story') {
@@ -428,8 +440,14 @@ export function installAutomation(viewer: Viewer): void {
             recordingObservedAt = new Date().toISOString()
             updateStoryOverlay(recordingObservedAt)
           }
-          if (!readiness?.fallbackApplied) startOrbit(request.camera, request.orbitDegPerSec)
+          if (presentation !== 'story') startOrbit(request.camera, request.orbitDegPerSec)
           startRecorder(presentation)
+          if (presentation === 'story' && !readiness?.fallbackApplied) {
+            const effectiveOrbitDegPerSec = request.orbitDegPerSec === undefined && legacyOrbitCount % 2 === 1
+              ? 2
+              : request.orbitDegPerSec
+            startOrbit(request.camera, effectiveOrbitDegPerSec)
+          }
           return { presentation, ...(readiness ? { readiness } : {}) }
         }
         return { presentation }
