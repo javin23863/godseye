@@ -1,70 +1,48 @@
-// OPS-WALL / KIOSK MODE (command-center). Button + hotkey "K" enters real
-// fullscreen, adds body.clean-ui + body.kiosk, and auto-cycles the camera through
-// the CITIES POI tour on a ~12s smooth flyTo timer with a minimal cycle ticker.
-// K/Esc exits and restores. fullscreenchange keeps state in sync. No entities.
-import { Cartesian3, Math as CMath, Viewer } from 'cesium'
-import { CITIES, makeOrbit } from './scenes'
-import { buildTour, tourLabel } from './kiosk-core.mjs'
+import {
+  applyPresentationState,
+  captureLayerState,
+  focusStoryLayers,
+  restoreLayerState,
+  updateStoryOverlayView,
+  type LayerState,
+} from './presentation'
 
-const CYCLE_MS = 12_000
-const TOUR = buildTour(CITIES)
-
-export function setupKiosk(viewer: Viewer) {
-  const ticker = document.createElement('div')
-  ticker.id = 'kiosk-ticker'
-  document.body.appendChild(ticker)
-
-  let timer: number | null = null
-  let idx = 0
-
-  // slow cinematic drift while dwelling on a stop (reuses the CAP-46 orbit)
-  const drift = makeOrbit(viewer)
-  const stopDrift = () => {
-    if (drift.active) drift.toggle()
-  }
-
-  const flyNext = () => {
-    const s = TOUR[idx % TOUR.length]
-    ticker.textContent = tourLabel(TOUR, idx)
-    idx++
-    stopDrift()
-    viewer.camera.flyTo({
-      destination: Cartesian3.fromDegrees(s.lon, s.lat, s.range),
-      orientation: { heading: 0, pitch: CMath.toRadians(-40), roll: 0 },
-      duration: 4,
-      complete: () => {
-        if (document.body.classList.contains('kiosk')) drift.toggle(0.5)
-      },
-    })
-  }
+// Manual Story presentation for the current analyst-selected scene. Camera
+// movement for recorded clips stays behind godseyeAutomationV1 readiness checks.
+export function setupKiosk() {
+  let layerState: LayerState[] = []
+  let previousPresentation: string | undefined
+  let previousCleanUi = false
 
   const enter = () => {
     if (document.body.classList.contains('kiosk')) return
-    document.body.classList.add('clean-ui', 'kiosk')
-    // requestFullscreen rejects if not user-gesture-driven; button/hotkey both are.
-    document.documentElement.requestFullscreen().catch(() => {})
-    idx = 0
-    flyNext()
-    timer = window.setInterval(flyNext, CYCLE_MS)
+    previousPresentation = document.body.dataset.presentation
+    previousCleanUi = document.body.classList.contains('clean-ui')
+    layerState = captureLayerState()
+    focusStoryLayers()
+    document.body.classList.add('kiosk')
+    applyPresentationState('story', true)
+    updateStoryOverlayView(
+      new Date().toISOString(),
+      'CURRENT ANALYST SCENE · NOT EVIDENCE CAPTURE',
+      ['NO EVIDENCE PACKET'],
+    )
   }
 
   const exit = () => {
     if (!document.body.classList.contains('kiosk')) return
-    document.body.classList.remove('clean-ui', 'kiosk')
-    stopDrift()
-    if (timer !== null) {
-      window.clearInterval(timer)
-      timer = null
-    }
-    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+    document.body.classList.remove('kiosk')
+    applyPresentationState(previousPresentation, previousCleanUi)
+    restoreLayerState(layerState)
+    layerState = []
   }
 
   const toggle = () => (document.body.classList.contains('kiosk') ? exit() : enter())
 
   const btn = document.createElement('button')
   btn.id = 'kiosk-toggle'
-  btn.textContent = 'OPS-WALL'
-  btn.title = 'Kiosk / ops-wall auto-cycle (K)'
+  btn.textContent = 'STORY MODE'
+  btn.title = 'Frame the current analyst scene for capture (K)'
   btn.onclick = toggle
   document.body.appendChild(btn)
 
@@ -76,11 +54,6 @@ export function setupKiosk(viewer: Viewer) {
     } else if (e.key === 'Escape' && document.body.classList.contains('kiosk')) {
       exit()
     }
-  })
-
-  // Browser Esc / F11 dropping fullscreen must pull us out of kiosk too.
-  document.addEventListener('fullscreenchange', () => {
-    if (!document.fullscreenElement && document.body.classList.contains('kiosk')) exit()
   })
 
   return { toggle, enter, exit }

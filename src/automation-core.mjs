@@ -10,6 +10,10 @@ function stringList(value, name) {
   }
 }
 
+export function mergeWarnings(...warningLists) {
+  return [...new Set(warningLists.flatMap((warnings) => warnings ?? []))]
+}
+
 /** Validate the public browser boundary before it touches DOM, Cesium, or MediaRecorder. */
 export function validateAutomationRequest(request) {
   if (!request || typeof request !== 'object' || !OPS.has(request.op)) {
@@ -32,6 +36,9 @@ export function validateAutomationRequest(request) {
       }
     }
     if (request.style !== undefined && typeof request.style !== 'string') throw new TypeError('style must be a string')
+    if (request.presentation !== undefined && !['analyst', 'story'].includes(request.presentation)) {
+      throw new TypeError('presentation must be analyst or story')
+    }
     stringList(request.actions, 'actions')
     stringList(request.afterActions, 'afterActions')
     if (request.quality !== undefined) {

@@ -9,6 +9,23 @@
 </head>
 <body>
   <div id="cesiumContainer"></div>
+  <section id="story-overlay" aria-label="Godseye temporal evidence frame" aria-hidden="true">
+    <div id="story-mark">
+      <span>GODSEYE</span>
+      <strong>TEMPORAL EVIDENCE</strong>
+    </div>
+    <div id="story-context">OBSERVED SCENE</div>
+    <div id="story-footer">
+      <div>
+        <span>OBSERVED</span>
+        <time id="story-observed"></time>
+      </div>
+      <div id="story-sources">
+        <span>ACTIVE SOURCES</span>
+        <div id="story-source-list"></div>
+      </div>
+    </div>
+  </section>
   <header id="brand">
     <h1>GODSEYE <span>VIEW</span></h1>
     <p>NO PLACE LEFT BEHIND</p>
@@ -44,8 +61,11 @@
       <div id="basemaps"></div>
     </section>
     <section>
-      <h2>DATA LAYERS</h2>
-      <div id="layers"></div>
+      <details id="layer-disclosure">
+        <summary>DATA LAYERS</summary>
+        <input id="layer-filter" type="search" aria-label="Find layer or command" placeholder="find layer or command…" />
+        <div id="layers"></div>
+      </details>
     </section>
     <section>
       <h2>SCENES</h2>

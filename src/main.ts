@@ -102,6 +102,15 @@ for (const { mode, label } of MODES) {
 // boot: try google3d, falls back to aerial when keyless
 ;(basemapDiv.querySelector('button[data-mode="google3d"]') as HTMLButtonElement).click()
 
+// Keep the full analyst surface available without making the layer rail dominant.
+const layerFilter = document.getElementById('layer-filter') as HTMLInputElement
+layerFilter.oninput = () => {
+  const query = layerFilter.value.trim().toLowerCase()
+  for (const element of document.getElementById('layers')!.children) {
+    ;(element as HTMLElement).hidden = Boolean(query) && !element.textContent?.toLowerCase().includes(query)
+  }
+}
+
 // -- data layers (CAP-07 / CAP-08 / CAP-09 / CAP-17) ----------------------
 addLayerRow(
   'NIGHT LIGHTS',
@@ -378,7 +387,9 @@ window.addEventListener('keydown', (e) => {
     const poi = CITIES[citySelect.selectedIndex].pois[poiIdx]
     if (poi) flyToPoi(viewer, poi)
   }
-  if (e.key === 'h' || e.key === 'H') document.body.classList.toggle('clean-ui')
+  if ((e.key === 'h' || e.key === 'H') && document.body.dataset.presentation !== 'story') {
+    document.body.classList.toggle('clean-ui')
+  }
 })
 
 // -- weather radar (M5, DS-09 NOAA NEXRAD via Iowa Mesonet WMS, CONUS) -------
@@ -764,8 +775,8 @@ installAutomation(viewer)
 // -- saved boards: named camera+layer views, load / share-link / delete -------
 initBoards({ ...shareOpts, viewer })
 
-// -- ops-wall kiosk mode: fullscreen auto-cycle through the city tour (K) -----
-setupKiosk(viewer)
+// -- Story presentation: stable current scene, no unvalidated camera motion (K) --
+setupKiosk()
 
 // -- one-click SOURCED BRIEF: LLM (or template) situation report + credibility badges --------
 initBrief({
