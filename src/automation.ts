@@ -3,6 +3,15 @@ import { createAutomationLifecycle } from './automation-core.mjs'
 import { createEvidencePacket } from './evidence-packet.mjs'
 import { captureState } from './scene-state'
 import { SOURCES } from './sources'
+import { needsStoryFallback, summarizeStoryReadiness } from './story-readiness.mjs'
+import {
+  applyPresentationState,
+  captureLayerState,
+  focusStoryLayers,
+  restoreLayerState,
+  updateStoryOverlayView,
+  type LayerState,
+} from './presentation'
 
 interface CameraRequest {
   lon: number
@@ -15,6 +24,7 @@ interface CameraRequest {
 interface BeginRequest {
   op: 'begin'
   camera: CameraRequest
+  presentation?: 'analyst' | 'story'
   style?: string
   actions?: string[]
   afterActions?: string[]
@@ -32,16 +42,34 @@ interface FinishRequest {
 }
 type AutomationRequest = { op: 'status' | 'drain' } | BeginRequest | FinishRequest
 
+type CheckLevel = 'pass' | 'warn' | 'fail'
+interface ReadinessCheck { level: CheckLevel; detail: string }
+interface StoryReadiness {
+  ready: boolean
+  fallbackApplied: boolean
+  checks: Record<'camera' | 'tiles' | 'sources' | 'overlays' | 'contrast', CheckLevel>
+  warnings: string[]
+}
+
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-function activeLayerKeys(): string[] {
+function activeLayers(): { key: string; label: string; registered: boolean }[] {
   const byLabel = new Map(Object.entries(SOURCES).map(([key, source]) => [source.label, key]))
   return [...document.querySelectorAll<HTMLLabelElement>('#layers label.layer-row')]
     .filter((label) => label.querySelector<HTMLInputElement>('input[type=checkbox]')?.checked)
-    .map((label) => label.dataset.layer ?? '')
+    .map((row) => row.dataset.layer ?? '')
     .filter(Boolean)
-    .map((label) => byLabel.get(label) ?? label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''))
+    .map((label) => {
+      const registered = byLabel.get(label)
+      return {
+        key: registered ?? label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+        label,
+        registered: Boolean(registered),
+      }
+    })
 }
+
+const activeLayerKeys = () => activeLayers().map(({ key }) => key)
 
 async function invoke(element: HTMLElement): Promise<void> {
   if (element.onclick) await element.onclick.call(element, new PointerEvent('click'))
@@ -82,20 +110,191 @@ export function installAutomation(viewer: Viewer): void {
   let stopped: Promise<void> | null = null
   let chunks: Blob[] = []
   let stopOrbit: (() => void) | null = null
+  let readinessWarnings: string[] = []
+  let focusWarnings: string[] = []
+  let previousPresentation: string | undefined
+  let previousCleanUi = false
+  let previousLayerState: LayerState[] = []
+  let recordingObservedAt: string | undefined
+  let storySourceLabels: string[] = []
+  let storyContextText = ''
+  let compositeFrame: number | null = null
+  const compositeCanvas = document.createElement('canvas')
+  const compositeContext = compositeCanvas.getContext('2d')
 
-  const startRecorder = () => {
-    if (typeof canvas.captureStream !== 'function' || typeof MediaRecorder === 'undefined') {
+  const restorePresentation = () => {
+    applyPresentationState(previousPresentation, previousCleanUi)
+    restoreLayerState(previousLayerState)
+    previousLayerState = []
+  }
+
+  const updateStoryOverlay = (observedAt = new Date().toISOString()) => {
+    const registered = activeLayers().filter((layer) => layer.registered)
+    storySourceLabels = registered.slice(0, 4).map(({ label }) => label)
+    storyContextText = registered.length
+      ? `${registered.length} REGISTERED SOURCE${registered.length === 1 ? '' : 'S'} · LIVE SCENE`
+      : 'SOURCE READINESS REQUIRED'
+    updateStoryOverlayView(observedAt, storyContextText, storySourceLabels)
+  }
+
+  const stopComposite = () => {
+    if (compositeFrame !== null) cancelAnimationFrame(compositeFrame)
+    compositeFrame = null
+  }
+
+  const drawComposite = (scheduleNext = false) => {
+    if (!compositeContext) return
+    const width = canvas.width
+    const height = canvas.height
+    if (compositeCanvas.width !== width || compositeCanvas.height !== height) {
+      compositeCanvas.width = width
+      compositeCanvas.height = height
+    }
+    const scale = Math.max(0.7, Math.min(width / 1600, height / 900))
+    const pad = Math.max(28 * scale, width * 0.04)
+    compositeContext.drawImage(canvas, 0, 0, width, height)
+    const shade = compositeContext.createLinearGradient(0, 0, 0, height)
+    shade.addColorStop(0, 'rgba(2,7,12,.42)')
+    shade.addColorStop(0.24, 'rgba(2,7,12,0)')
+    shade.addColorStop(0.68, 'rgba(2,7,12,0)')
+    shade.addColorStop(1, 'rgba(2,7,12,.74)')
+    compositeContext.fillStyle = shade
+    compositeContext.fillRect(0, 0, width, height)
+
+    compositeContext.textBaseline = 'top'
+    compositeContext.fillStyle = '#ffc269'
+    compositeContext.font = `700 ${Math.round(12 * scale)}px "Segoe UI", sans-serif`
+    compositeContext.fillText('G O D S E Y E', pad, pad)
+    compositeContext.fillStyle = '#f5f1e8'
+    compositeContext.font = `400 ${Math.round(18 * scale)}px "Segoe UI", sans-serif`
+    compositeContext.fillText('T E M P O R A L   E V I D E N C E', pad, pad + 22 * scale)
+
+    compositeContext.textAlign = 'right'
+    compositeContext.fillStyle = 'rgba(245,241,232,.7)'
+    compositeContext.font = `400 ${Math.round(10 * scale)}px "Segoe UI", sans-serif`
+    compositeContext.fillText(storyContextText, width - pad, pad)
+    compositeContext.textAlign = 'left'
+    compositeContext.fillStyle = 'rgba(245,241,232,.48)'
+    compositeContext.fillText('OBSERVED', pad, height - pad - 30 * scale)
+    compositeContext.fillStyle = '#f5f1e8'
+    compositeContext.font = `400 ${Math.round(18 * scale)}px "Segoe UI", sans-serif`
+    compositeContext.fillText(recordingObservedAt?.replace('.000Z', 'Z') ?? '', pad, height - pad - 15 * scale)
+
+    compositeContext.textAlign = 'right'
+    compositeContext.fillStyle = 'rgba(245,241,232,.48)'
+    compositeContext.font = `400 ${Math.round(10 * scale)}px "Segoe UI", sans-serif`
+    compositeContext.fillText('ACTIVE SOURCES', width - pad, height - pad - 30 * scale)
+    compositeContext.fillStyle = '#f5f1e8'
+    compositeContext.fillText(storySourceLabels.join('  ·  '), width - pad, height - pad - 14 * scale)
+    compositeContext.textAlign = 'left'
+
+    const threadX = pad + 3 * scale
+    const thread = compositeContext.createLinearGradient(0, height * 0.18, 0, height * 0.81)
+    thread.addColorStop(0, 'rgba(255,194,105,0)')
+    thread.addColorStop(0.24, 'rgba(255,194,105,.72)')
+    thread.addColorStop(0.76, 'rgba(107,211,214,.6)')
+    thread.addColorStop(1, 'rgba(107,211,214,0)')
+    compositeContext.strokeStyle = thread
+    compositeContext.beginPath()
+    compositeContext.moveTo(threadX, height * 0.18)
+    compositeContext.lineTo(threadX, height * 0.81)
+    compositeContext.stroke()
+    if (scheduleNext) compositeFrame = requestAnimationFrame(() => drawComposite(true))
+  }
+
+  const inspectFrameContrast = (surface: HTMLCanvasElement = canvas): ReadinessCheck => {
+    const sample = document.createElement('canvas')
+    sample.width = 12
+    sample.height = 8
+    const context = sample.getContext('2d', { willReadFrequently: true })
+    if (!context) return { level: 'warn', detail: 'frame sampling is unavailable' }
+    try {
+      context.drawImage(surface, 0, 0, sample.width, sample.height)
+      const pixels = context.getImageData(0, 0, sample.width, sample.height).data
+      const values: number[] = []
+      let dark = 0
+      let bright = 0
+      for (let i = 0; i < pixels.length; i += 4) {
+        const value = 0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2]
+        values.push(value)
+        if (value < 12) dark++
+        if (value > 244) bright++
+      }
+      const mean = values.reduce((sum, value) => sum + value, 0) / values.length
+      const spread = Math.sqrt(values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length)
+      if (dark / values.length > 0.94) return { level: 'fail', detail: 'frame is nearly black' }
+      if (bright / values.length > 0.88) return { level: 'fail', detail: 'frame is overexposed' }
+      if (spread < 4) return { level: 'fail', detail: 'frame has insufficient visual contrast' }
+      return { level: 'pass', detail: `luminance spread ${spread.toFixed(1)}` }
+    } catch {
+      return { level: 'warn', detail: 'cross-origin imagery prevented contrast sampling' }
+    }
+  }
+
+  const inspectStoryReadiness = (): StoryReadiness => {
+    viewer.scene.render()
+    drawComposite(false)
+    const active = activeLayers()
+    const registered = active.filter((layer) => layer.registered)
+    const unregistered = active.filter((layer) => !layer.registered)
+    const overlay = document.getElementById('story-overlay')
+    const bounds = overlay?.getBoundingClientRect()
+    const overlayFits = Boolean(bounds && bounds.width > 0 && bounds.height > 0 &&
+      bounds.left >= 0 && bounds.top >= 0 && bounds.right <= innerWidth && bounds.bottom <= innerHeight)
+    const cameraHeight = viewer.camera.positionCartographic.height
+    const globeVisible = viewer.scene.globe.show && Boolean(viewer.camera.computeViewRectangle(viewer.scene.globe.ellipsoid))
+    const checks = {
+      camera: cameraHeight > 100 && globeVisible
+        ? { level: 'pass' as const, detail: `globe visible at ${Math.round(cameraHeight)}m` }
+        : { level: 'fail' as const, detail: 'camera is below a safe range or the globe is not visible' },
+      tiles: viewer.scene.globe.tilesLoaded
+        ? { level: 'pass' as const, detail: 'globe tiles ready' }
+        : { level: 'fail' as const, detail: 'globe tiles are still loading' },
+      sources: !registered.length
+        ? { level: 'fail' as const, detail: 'no active registered source' }
+        : unregistered.length
+          ? { level: 'warn' as const, detail: `unregistered active layers: ${unregistered.map(({ key }) => key).join(', ')}` }
+          : { level: 'pass' as const, detail: `${registered.length} active registered source${registered.length === 1 ? '' : 's'}` },
+      overlays: overlayFits
+        ? { level: 'pass' as const, detail: 'Story overlay fits the capture frame' }
+        : { level: 'fail' as const, detail: 'Story overlay is hidden or outside the capture frame' },
+      contrast: inspectFrameContrast(compositeCanvas),
+    }
+    return summarizeStoryReadiness(checks) as StoryReadiness
+  }
+
+  const startRecorder = (presentation: 'analyst' | 'story') => {
+    const surface = presentation === 'story' ? compositeCanvas : canvas
+    if (presentation === 'story') {
+      if (!compositeContext) throw new Error('Story capture composition is unavailable in this browser')
+      stopComposite()
+      drawComposite(true)
+    }
+    if (typeof surface.captureStream !== 'function' || typeof MediaRecorder === 'undefined') {
       throw new Error('canvas recording is unavailable in this browser')
     }
     chunks = []
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm'
-    recorder = new MediaRecorder(canvas.captureStream(30), { mimeType, videoBitsPerSecond: 12_000_000 })
+    recorder = new MediaRecorder(surface.captureStream(30), { mimeType, videoBitsPerSecond: 12_000_000 })
     recorder.ondataavailable = (event) => event.data.size && chunks.push(event.data)
     stopped = new Promise((resolve) => { recorder!.onstop = () => resolve() })
     recorder.start(1000)
   }
 
   const fly = (camera: CameraRequest, duration: number) => new Promise<void>((resolve, reject) => {
+    let timedOut = false
+    const timeout = window.setTimeout(() => {
+      timedOut = true
+      viewer.camera.cancelFlight()
+    }, Math.max(3_000, duration * 1_000 + 3_000))
+    const complete = () => {
+      clearTimeout(timeout)
+      resolve()
+    }
+    const cancel = () => {
+      clearTimeout(timeout)
+      reject(new Error(timedOut ? 'camera flight timed out' : 'camera flight cancelled'))
+    }
     viewer.camera.flyTo({
       destination: Cartesian3.fromDegrees(camera.lon, camera.lat, camera.height),
       orientation: {
@@ -104,10 +303,24 @@ export function installAutomation(viewer: Viewer): void {
         roll: 0,
       },
       duration,
-      complete: resolve,
-      cancel: () => reject(new Error('camera flight cancelled')),
+      complete,
+      cancel,
     })
   })
+
+  const applySafeCamera = (camera: CameraRequest): number => {
+    stopOrbit?.()
+    const height = Math.min(2_500_000, Math.max(250_000, camera.height * 2.5))
+    viewer.camera.setView({
+      destination: Cartesian3.fromDegrees(camera.lon, camera.lat, height),
+      orientation: {
+        heading: CMath.toRadians(camera.headingDeg ?? 0),
+        pitch: CMath.toRadians(-45),
+        roll: 0,
+      },
+    })
+    return height
+  }
 
   const startOrbit = (camera: CameraRequest, degPerSec?: number) => {
     if (!degPerSec) return
@@ -136,8 +349,17 @@ export function installAutomation(viewer: Viewer): void {
     status: () => ({
       ready: true,
       recording: typeof canvas.captureStream === 'function' && typeof MediaRecorder !== 'undefined',
+      presentations: ['analyst', 'story'],
     }),
     begin: async (request: BeginRequest) => {
+      const presentation = request.presentation ?? 'analyst'
+      previousPresentation = document.body.dataset.presentation
+      previousCleanUi = document.body.classList.contains('clean-ui')
+      previousLayerState = presentation === 'story' ? captureLayerState() : []
+      readinessWarnings = []
+      focusWarnings = []
+      recordingObservedAt = undefined
+      applyPresentationState(presentation, previousCleanUi)
       try {
         if (request.quality) {
           viewer.resolutionScale = request.quality.resolutionScale
@@ -156,21 +378,58 @@ export function installAutomation(viewer: Viewer): void {
         }
         for (const token of request.actions ?? []) await applyAction(token)
 
-        if (request.camera.fromHeight) {
+        if (presentation === 'analyst' && request.camera.fromHeight) {
           viewer.camera.setView({ destination: Cartesian3.fromDegrees(request.camera.lon, request.camera.lat, request.camera.fromHeight) })
           await wait(2500)
-          startRecorder()
+          startRecorder(presentation)
           await fly(request.camera, request.flyDurationSec ?? 6)
           startOrbit(request.camera, request.orbitDegPerSec)
         } else {
-          await fly(request.camera, request.flyDurationSec ?? 3)
+          let flightFallbackHeight: number | undefined
+          try {
+            await fly(request.camera, request.flyDurationSec ?? 3)
+          } catch (error) {
+            if (presentation !== 'story') throw error
+            flightFallbackHeight = applySafeCamera(request.camera)
+            focusWarnings.push(`safe camera fallback applied after ${error instanceof Error ? error.message : 'camera flight failed'}`)
+          }
           await wait((request.settleSec ?? 4) * 1000)
           for (const token of request.afterActions ?? []) await applyAction(token)
           if (request.afterActions?.length) await wait((request.actionWaitSec ?? 5) * 1000)
-          startOrbit(request.camera, request.orbitDegPerSec)
-          startRecorder()
+          let readiness: StoryReadiness | undefined
+          if (presentation === 'story') {
+            const explicitLabels = [...(request.actions ?? []), ...(request.afterActions ?? [])]
+              .filter((token) => token.startsWith('layer:') && !token.endsWith(':off'))
+              .map((token) => token.slice(6))
+            const registeredLabels = activeLayers().filter((layer) => layer.registered).map((layer) => layer.label)
+            const hiddenLayers = focusStoryLayers([...explicitLabels, ...registeredLabels])
+            if (hiddenLayers) focusWarnings.push(`Story focus hid ${hiddenLayers} extra active layer${hiddenLayers === 1 ? '' : 's'}`)
+            recordingObservedAt = new Date().toISOString()
+            updateStoryOverlay(recordingObservedAt)
+            readiness = inspectStoryReadiness()
+            if (flightFallbackHeight !== undefined) {
+              readiness.fallbackApplied = true
+              readiness.warnings.unshift(`safe camera fallback applied at ${Math.round(flightFallbackHeight)}m`)
+            } else if (!readiness.ready && needsStoryFallback(readiness)) {
+              const fallbackHeight = applySafeCamera(request.camera)
+              await wait(2_000)
+              updateStoryOverlay()
+              readiness = inspectStoryReadiness()
+              readiness.fallbackApplied = true
+              readiness.warnings.unshift(`safe camera fallback applied at ${Math.round(fallbackHeight)}m`)
+            }
+            if (!readiness.ready) {
+              throw new Error(`Story frame is not capture-ready: ${readiness.warnings.join('; ')}`)
+            }
+            readinessWarnings = [...focusWarnings, ...readiness.warnings]
+            recordingObservedAt = new Date().toISOString()
+            updateStoryOverlay(recordingObservedAt)
+          }
+          if (!readiness?.fallbackApplied) startOrbit(request.camera, request.orbitDegPerSec)
+          startRecorder(presentation)
+          return { presentation, ...(readiness ? { readiness } : {}) }
         }
-        return {}
+        return { presentation }
       } catch (error) {
         stopOrbit?.()
         if (recorder?.state === 'recording') {
@@ -180,6 +439,8 @@ export function installAutomation(viewer: Viewer): void {
         recorder = null
         stopped = null
         chunks = []
+        stopComposite()
+        restorePresentation()
         throw error
       }
     },
@@ -187,7 +448,9 @@ export function installAutomation(viewer: Viewer): void {
       stopOrbit?.()
       recorder!.stop()
       await stopped
+      stopComposite()
       const scene = captureState(viewer, {
+        observedAt: recordingObservedAt,
         layers: activeLayerKeys(),
         style: document.getElementById('style-name')?.textContent?.trim() || undefined,
         basemap: document.querySelector<HTMLButtonElement>('#basemaps button.active')?.dataset.mode,
@@ -198,7 +461,7 @@ export function installAutomation(viewer: Viewer): void {
           scene,
           claims: request.claims,
           artifacts: request.artifacts,
-          warnings: request.warnings,
+          warnings: [...new Set([...(request.warnings ?? []), ...readinessWarnings])],
         }),
       }
     },
@@ -207,6 +470,8 @@ export function installAutomation(viewer: Viewer): void {
       if (!blob) {
         recorder = null
         stopped = null
+        recordingObservedAt = undefined
+        restorePresentation()
         return null
       }
       return await new Promise<string>((resolve, reject) => {

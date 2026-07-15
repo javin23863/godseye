@@ -32,6 +32,9 @@ export function validateAutomationRequest(request) {
       }
     }
     if (request.style !== undefined && typeof request.style !== 'string') throw new TypeError('style must be a string')
+    if (request.presentation !== undefined && !['analyst', 'story'].includes(request.presentation)) {
+      throw new TypeError('presentation must be analyst or story')
+    }
     stringList(request.actions, 'actions')
     stringList(request.afterActions, 'afterActions')
     if (request.quality !== undefined) {

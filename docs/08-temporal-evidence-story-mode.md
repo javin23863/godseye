@@ -1,18 +1,18 @@
 # 08 — Temporal Evidence and Story Mode
 
-- **Status:** Proposed; Story mode is not merged
+- **Status:** Accepted design and implementation baseline; repository state is not a production-deployment guarantee
 - **Owner:** javin23863
 - **Repository:** `javin23863/godseye`
 - **Last updated:** 2026-07-15
 - **Contract PR #1:** Merged to `main` at `f292d883de43d893ea7381c481e8e334fcac6400` on 2026-07-15
+- **Policy/plan PR #2:** Merged to `main` at `f4b85e2db1a72f10a705fc1dc23b3f5f54d620ef` on 2026-07-15
 - **Related contract branch (merged):** `agent/scene-evidence-automation-v1`
-- **Next step:** Review this policy/plan PR; Story mode remains the proposed follow-on.
 
 ## Purpose
 
 Godseye is an independent real-time geospatial evidence and storytelling application. “God's Eye View” refers only to the attributed upstream inspiration documented in `00-overview.md`; the project name is **Godseye**.
 
-Docs 00–07 preserve the reconstruction evidence and original parity roadmap. This proposal governs the next visual direction: make time, source provenance, and uncertainty visible instead of adding more generic tactical decoration.
+Docs 00–07 preserve the reconstruction evidence and original parity roadmap. This accepted design baseline governs the next visual direction: make time, source provenance, and uncertainty visible instead of adding more generic tactical decoration.
 
 Godseye does not adopt Apollo's organic intelligence identity. TraderCockpit may use Godseye footage and versioned evidence packets, but the repositories, installations, interfaces, and brands remain separate.
 
@@ -192,7 +192,7 @@ No change. Return the next base64 chunk or `null`; the lifecycle returns to idle
 ## Delivery order
 
 1. Record the merged contract and automation baseline from Godseye PR #1 at `f292d883de43d893ea7381c481e8e334fcac6400` on `main`.
-2. Review and merge this policy/plan; Story mode remains proposed.
+2. Preserve the accepted policy/plan baseline from PR #2 at `f4b85e2db1a72f10a705fc1dc23b3f5f54d620ef`; Story implementation remains a separate follow-on change.
 3. Add `presentation` validation and additive status/begin response fields with focused tests.
 4. Build the minimal Story chrome and dual-safe CSS on the existing viewer.
 5. Add readiness checks and one deterministic fallback.
