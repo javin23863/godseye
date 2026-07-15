@@ -10,6 +10,10 @@ function stringList(value, name) {
   }
 }
 
+export function mergeWarnings(...warningLists) {
+  return [...new Set(warningLists.flatMap((warnings) => warnings ?? []))]
+}
+
 /** Validate the public browser boundary before it touches DOM, Cesium, or MediaRecorder. */
 export function validateAutomationRequest(request) {
   if (!request || typeof request !== 'object' || !OPS.has(request.op)) {

@@ -1,9 +1,9 @@
-import { Cartesian3, Matrix4, Math as CMath, type Viewer } from 'cesium'
-import { createAutomationLifecycle } from './automation-core.mjs'
+import { Cartesian3, Cesium3DTileset, Matrix4, Math as CMath, type Viewer } from 'cesium'
+import { createAutomationLifecycle, mergeWarnings } from './automation-core.mjs'
 import { createEvidencePacket } from './evidence-packet.mjs'
 import { captureState } from './scene-state'
 import { SOURCES } from './sources'
-import { needsStoryFallback, summarizeStoryReadiness } from './story-readiness.mjs'
+import { needsStoryFallback, storySafeBounds, summarizeStoryReadiness, summarizeStoryTiles } from './story-readiness.mjs'
 import {
   applyPresentationState,
   captureLayerState,
@@ -52,6 +52,15 @@ interface StoryReadiness {
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+function visibleTilesets(viewer: Viewer): Cesium3DTileset[] {
+  const tilesets: Cesium3DTileset[] = []
+  for (let index = 0; index < viewer.scene.primitives.length; index++) {
+    const primitive = viewer.scene.primitives.get(index)
+    if (primitive instanceof Cesium3DTileset && primitive.show) tilesets.push(primitive)
+  }
+  return tilesets
+}
 
 function activeLayers(): { key: string; label: string; registered: boolean }[] {
   const byLabel = new Map(Object.entries(SOURCES).map(([key, source]) => [source.label, key]))
@@ -151,7 +160,9 @@ export function installAutomation(viewer: Viewer): void {
       compositeCanvas.height = height
     }
     const scale = Math.max(0.7, Math.min(width / 1600, height / 900))
-    const pad = Math.max(28 * scale, width * 0.04)
+    const safe = storySafeBounds(width, height)
+    const padX = safe.left
+    const padY = safe.top
     compositeContext.drawImage(canvas, 0, 0, width, height)
     const shade = compositeContext.createLinearGradient(0, 0, 0, height)
     shade.addColorStop(0, 'rgba(2,7,12,.42)')
@@ -164,41 +175,29 @@ export function installAutomation(viewer: Viewer): void {
     compositeContext.textBaseline = 'top'
     compositeContext.fillStyle = '#ffc269'
     compositeContext.font = `700 ${Math.round(12 * scale)}px "Segoe UI", sans-serif`
-    compositeContext.fillText('G O D S E Y E', pad, pad)
+    compositeContext.fillText('G O D S E Y E', padX, padY)
     compositeContext.fillStyle = '#f5f1e8'
     compositeContext.font = `400 ${Math.round(18 * scale)}px "Segoe UI", sans-serif`
-    compositeContext.fillText('T E M P O R A L   E V I D E N C E', pad, pad + 22 * scale)
+    compositeContext.fillText('T E M P O R A L   E V I D E N C E', padX, padY + 22 * scale)
 
     compositeContext.textAlign = 'right'
     compositeContext.fillStyle = 'rgba(245,241,232,.7)'
     compositeContext.font = `400 ${Math.round(10 * scale)}px "Segoe UI", sans-serif`
-    compositeContext.fillText(storyContextText, width - pad, pad)
+    compositeContext.fillText(storyContextText, safe.right, padY)
     compositeContext.textAlign = 'left'
     compositeContext.fillStyle = 'rgba(245,241,232,.48)'
-    compositeContext.fillText('OBSERVED', pad, height - pad - 30 * scale)
+    compositeContext.fillText('OBSERVED', padX, safe.bottom - 30 * scale)
     compositeContext.fillStyle = '#f5f1e8'
     compositeContext.font = `400 ${Math.round(18 * scale)}px "Segoe UI", sans-serif`
-    compositeContext.fillText(recordingObservedAt?.replace('.000Z', 'Z') ?? '', pad, height - pad - 15 * scale)
+    compositeContext.fillText(recordingObservedAt?.replace('.000Z', 'Z') ?? '', padX, safe.bottom - 15 * scale)
 
     compositeContext.textAlign = 'right'
     compositeContext.fillStyle = 'rgba(245,241,232,.48)'
     compositeContext.font = `400 ${Math.round(10 * scale)}px "Segoe UI", sans-serif`
-    compositeContext.fillText('ACTIVE SOURCES', width - pad, height - pad - 30 * scale)
+    compositeContext.fillText('ACTIVE SOURCES', safe.right, safe.bottom - 30 * scale)
     compositeContext.fillStyle = '#f5f1e8'
-    compositeContext.fillText(storySourceLabels.join('  ·  '), width - pad, height - pad - 14 * scale)
+    compositeContext.fillText(storySourceLabels.join('  ·  '), safe.right, safe.bottom - 14 * scale)
     compositeContext.textAlign = 'left'
-
-    const threadX = pad + 3 * scale
-    const thread = compositeContext.createLinearGradient(0, height * 0.18, 0, height * 0.81)
-    thread.addColorStop(0, 'rgba(255,194,105,0)')
-    thread.addColorStop(0.24, 'rgba(255,194,105,.72)')
-    thread.addColorStop(0.76, 'rgba(107,211,214,.6)')
-    thread.addColorStop(1, 'rgba(107,211,214,0)')
-    compositeContext.strokeStyle = thread
-    compositeContext.beginPath()
-    compositeContext.moveTo(threadX, height * 0.18)
-    compositeContext.lineTo(threadX, height * 0.81)
-    compositeContext.stroke()
     if (scheduleNext) compositeFrame = requestAnimationFrame(() => drawComposite(true))
   }
 
@@ -237,28 +236,31 @@ export function installAutomation(viewer: Viewer): void {
     const active = activeLayers()
     const registered = active.filter((layer) => layer.registered)
     const unregistered = active.filter((layer) => !layer.registered)
-    const overlay = document.getElementById('story-overlay')
-    const bounds = overlay?.getBoundingClientRect()
-    const overlayFits = Boolean(bounds && bounds.width > 0 && bounds.height > 0 &&
-      bounds.left >= 0 && bounds.top >= 0 && bounds.right <= innerWidth && bounds.bottom <= innerHeight)
+    const safe = storySafeBounds(innerWidth, innerHeight)
+    const overlayFits = ['#story-mark', '#story-context', '#story-footer'].every((selector) => {
+      const element = document.querySelector<HTMLElement>(selector)
+      const style = element ? getComputedStyle(element) : null
+      const bounds = element?.getBoundingClientRect()
+      return Boolean(element && style && style.display !== 'none' && style.visibility !== 'hidden' &&
+        Number(style.opacity) > 0 && bounds && bounds.width > 0 && bounds.height > 0 &&
+        bounds.left >= safe.left && bounds.top >= safe.top && bounds.right <= safe.right && bounds.bottom <= safe.bottom)
+    })
     const cameraHeight = viewer.camera.positionCartographic.height
     const globeVisible = viewer.scene.globe.show && Boolean(viewer.camera.computeViewRectangle(viewer.scene.globe.ellipsoid))
     const checks = {
       camera: cameraHeight > 100 && globeVisible
         ? { level: 'pass' as const, detail: `globe visible at ${Math.round(cameraHeight)}m` }
         : { level: 'fail' as const, detail: 'camera is below a safe range or the globe is not visible' },
-      tiles: viewer.scene.globe.tilesLoaded
-        ? { level: 'pass' as const, detail: 'globe tiles ready' }
-        : { level: 'fail' as const, detail: 'globe tiles are still loading' },
+      tiles: summarizeStoryTiles(viewer.scene.globe.tilesLoaded, visibleTilesets(viewer)),
       sources: !registered.length
         ? { level: 'fail' as const, detail: 'no active registered source' }
         : unregistered.length
           ? { level: 'warn' as const, detail: `unregistered active layers: ${unregistered.map(({ key }) => key).join(', ')}` }
           : { level: 'pass' as const, detail: `${registered.length} active registered source${registered.length === 1 ? '' : 's'}` },
       overlays: overlayFits
-        ? { level: 'pass' as const, detail: 'Story overlay fits the capture frame' }
-        : { level: 'fail' as const, detail: 'Story overlay is hidden or outside the capture frame' },
-      contrast: inspectFrameContrast(compositeCanvas),
+        ? { level: 'pass' as const, detail: 'Story evidence elements fit the responsive safe frame above the caption reserve' }
+        : { level: 'fail' as const, detail: 'Story evidence element is hidden, clipped, or inside the caption reserve' },
+      contrast: inspectFrameContrast(canvas),
     }
     return summarizeStoryReadiness(checks) as StoryReadiness
   }
@@ -461,7 +463,7 @@ export function installAutomation(viewer: Viewer): void {
           scene,
           claims: request.claims,
           artifacts: request.artifacts,
-          warnings: [...new Set([...(request.warnings ?? []), ...readinessWarnings])],
+          warnings: mergeWarnings(request.warnings, readinessWarnings),
         }),
       }
     },

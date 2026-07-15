@@ -11,9 +11,13 @@ import {
 // movement for recorded clips stays behind godseyeAutomationV1 readiness checks.
 export function setupKiosk() {
   let layerState: LayerState[] = []
+  let previousPresentation: string | undefined
+  let previousCleanUi = false
 
   const enter = () => {
     if (document.body.classList.contains('kiosk')) return
+    previousPresentation = document.body.dataset.presentation
+    previousCleanUi = document.body.classList.contains('clean-ui')
     layerState = captureLayerState()
     focusStoryLayers()
     document.body.classList.add('kiosk')
@@ -28,7 +32,7 @@ export function setupKiosk() {
   const exit = () => {
     if (!document.body.classList.contains('kiosk')) return
     document.body.classList.remove('kiosk')
-    applyPresentationState(undefined, false)
+    applyPresentationState(previousPresentation, previousCleanUi)
     restoreLayerState(layerState)
     layerState = []
   }

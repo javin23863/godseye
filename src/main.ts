@@ -387,7 +387,9 @@ window.addEventListener('keydown', (e) => {
     const poi = CITIES[citySelect.selectedIndex].pois[poiIdx]
     if (poi) flyToPoi(viewer, poi)
   }
-  if (e.key === 'h' || e.key === 'H') document.body.classList.toggle('clean-ui')
+  if ((e.key === 'h' || e.key === 'H') && document.body.dataset.presentation !== 'story') {
+    document.body.classList.toggle('clean-ui')
+  }
 })
 
 // -- weather radar (M5, DS-09 NOAA NEXRAD via Iowa Mesonet WMS, CONUS) -------

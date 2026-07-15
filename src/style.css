@@ -17,29 +17,18 @@ body[data-presentation='story'] #cesiumContainer::after {
     radial-gradient(ellipse at 52% 44%, transparent 45%, rgba(1, 5, 9, 0.5) 100%);
 }
 #story-mark {
-  position: absolute; top: max(28px, 4vh); left: max(28px, 4vw);
+  position: absolute; top: max(30px, 4vh); left: max(28px, 4vw);
   display: grid; gap: 5px; letter-spacing: 0.22em;
 }
 #story-mark span { color: #ffc269; font-size: clamp(10px, 0.8vw, 13px); font-weight: 700; }
 #story-mark strong { font-size: clamp(13px, 1.2vw, 20px); font-weight: 400; }
-#story-thread {
-  position: absolute; top: 18%; bottom: 19%; left: max(31px, 4.2vw); width: 1px;
-  background: linear-gradient(transparent, rgba(255, 194, 105, 0.72) 24%, rgba(107, 211, 214, 0.6) 76%, transparent);
-  box-shadow: 0 0 18px rgba(107, 211, 214, 0.28);
-}
-#story-thread::before, #story-thread::after {
-  content: ''; position: absolute; left: 50%; width: 7px; height: 7px; border-radius: 50%;
-  background: #ffc269; transform: translate(-50%, -50%); box-shadow: 0 0 18px rgba(255, 194, 105, 0.8);
-}
-#story-thread::before { top: 24%; }
-#story-thread::after { top: 76%; background: #6bd3d6; box-shadow: 0 0 18px rgba(107, 211, 214, 0.8); }
 #story-context {
   position: absolute; top: max(30px, 4vh); right: max(28px, 4vw); max-width: 42vw;
   color: rgba(245, 241, 232, 0.7); font-size: clamp(9px, 0.72vw, 12px);
   letter-spacing: 0.18em; text-align: right;
 }
 #story-footer {
-  position: absolute; right: max(28px, 4vw); bottom: max(27px, 4vh); left: max(28px, 4vw);
+  position: absolute; right: max(28px, 4vw); bottom: max(27px, 18vh); left: max(28px, 4vw);
   display: flex; align-items: end; justify-content: space-between; gap: 24px;
 }
 #story-footer span { color: rgba(245, 241, 232, 0.48); font-size: 9px; letter-spacing: 0.2em; }
@@ -53,16 +42,11 @@ body[data-presentation='story'] #cesiumContainer::after {
 #story-source-list b + b::before { content: '·'; color: #6bd3d6; margin-right: 7px; }
 @media (max-aspect-ratio: 3/4) {
   #story-context { top: 9vh; max-width: 64vw; }
-  #story-thread { top: 19%; bottom: 24%; }
+  #story-footer { bottom: max(27px, 24vh); }
   #story-footer { display: grid; }
   #story-sources { max-width: 100%; text-align: left; }
   #story-source-list { justify-content: start; }
 }
-@media (prefers-reduced-motion: reduce) {
-  #story-thread { box-shadow: none; }
-  #story-thread::before, #story-thread::after { box-shadow: none; }
-}
-
 /* full-screen vignette + faint scanlines over the scene, under the HUD (later DOM siblings win) */
 #cesiumContainer::after {
   content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;

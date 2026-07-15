@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { createAutomationLifecycle, validateAutomationRequest } from '../src/automation-core.mjs'
+import { createAutomationLifecycle, mergeWarnings, validateAutomationRequest } from '../src/automation-core.mjs'
 
 test('automation validates begin input and enforces record/drain lifecycle', async () => {
   assert.throws(
@@ -10,6 +10,36 @@ test('automation validates begin input and enforces record/drain lifecycle', asy
   assert.throws(
     () => validateAutomationRequest({ op: 'begin', presentation: 'cinematic', camera: { lon: 0, lat: 0, height: 1 } }),
     /presentation must be analyst or story/,
+  )
+
+  const touched = []
+  const guarded = createAutomationLifecycle({
+    status: () => { touched.push('status'); return {} },
+    begin: async () => { touched.push('begin'); return {} },
+    finish: async () => { touched.push('finish'); return {} },
+    drain: async () => { touched.push('drain'); return null },
+  })
+  await assert.rejects(
+    () => guarded({ op: 'begin', presentation: 'cinematic', camera: { lon: 0, lat: 0, height: 1 } }),
+    /presentation must be analyst or story/,
+  )
+  assert.deepEqual(touched, [])
+
+  let omittedPresentation
+  const analyst = createAutomationLifecycle({
+    status: () => ({}),
+    begin: async (request) => { omittedPresentation = request.presentation; return { presentation: request.presentation ?? 'analyst' } },
+    finish: async () => ({}),
+    drain: async () => null,
+  })
+  const omitted = await analyst({ op: 'begin', camera: { lon: 0, lat: 0, height: 1 } })
+  assert.equal(omitted.presentation, 'analyst')
+  assert.equal(omittedPresentation, undefined)
+  await analyst({ op: 'finish' })
+  await analyst({ op: 'drain' })
+  assert.deepEqual(
+    mergeWarnings(['caller warning', 'shared warning'], ['readiness warning', 'shared warning']),
+    ['caller warning', 'shared warning', 'readiness warning'],
   )
 
   const calls = []
